@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EverRise</title>
+    <link rel="icon" href="data:," />   <!-- no-op favicon: avoids a 404 request -->
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <!-- Import map: lets the game run from a plain static server (VS Code Live
+         Server, "open with…", etc.) with no bundler, by resolving the bare
+         `phaser` import to the installed package's ESM build. The path is
+         relative to this file, so it works whatever folder the server roots at,
+         and works offline. Under `npm run dev` / `npm run build`, Vite resolves
+         Phaser itself and ignores this map. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "phaser": "./phaser-shim.js"
+        }
+      }
+    </script>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
