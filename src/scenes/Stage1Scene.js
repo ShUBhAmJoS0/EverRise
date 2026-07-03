@@ -14,9 +14,14 @@ import { impactSparks } from '../systems/fx.js';
 import Audio from '../systems/AudioManager.js';
 import Yarsagumba from '../entities/pickups/Yarsagumba.js';
 
-const BG_TILE_WIDTH  = 1376;
 const GAME_HEIGHT    = 720;
 const PLATFORM_IMG_W = 677;
+
+// Background native 1774×887 → scaled to fill the 720px-tall view, then tiled
+// at exactly that scaled width so consecutive copies butt together with no
+// overlap/gap (same pattern as Stage2Scene/Stage3Scene).
+const BG_SCALE       = GAME_HEIGHT / 887;
+const BG_TILE_WIDTH  = 1774 * BG_SCALE;
 
 const YARSA_KEY = 'yarsa:Stage1';   // registry flag: herb already eaten this run
 const YARSA_X   = 3380;             // where it lies in the grass, before the witch
@@ -151,7 +156,9 @@ export default class Stage1Scene extends Phaser.Scene {
   _buildBackground() {
     const tilesNeeded = Math.ceil(LEVEL_WIDTH / BG_TILE_WIDTH) + 1;
     for (let i = 0; i < tilesNeeded; i++) {
-      this.add.image(i * BG_TILE_WIDTH + BG_TILE_WIDTH / 2, GAME_HEIGHT / 2, 'stage1-bg');
+      this.add.image(i * BG_TILE_WIDTH + BG_TILE_WIDTH / 2, GAME_HEIGHT / 2, 'stage1-bg')
+        .setDisplaySize(BG_TILE_WIDTH, GAME_HEIGHT)
+        .setDepth(0);
     }
   }
 

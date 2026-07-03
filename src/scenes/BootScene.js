@@ -8,7 +8,7 @@ export default class BootScene extends Phaser.Scene {
 
   preload() {
     // ── Background & Platform ──────────────────────────────────────────────
-    this.load.image('stage1-bg', 'assets/backgrounds/stage1/stage1_background.png');
+    this.load.image('stage1-bg', 'assets/backgrounds/stage1/stage1_backgroundddd.png');
     this.load.image('stage1-platform', 'assets/platforms/stage1/stage1_platform.png');
 
     this.load.image('stage2-bg', 'assets/backgrounds/stage2/stage2_backgroundd.png');
@@ -46,9 +46,25 @@ export default class BootScene extends Phaser.Scene {
     // ── Corrupted Monk (Stage 2 final boss) ─────────────────────────────────
     this.load.spritesheet('monk-idle',        'assets/characters/corrupted-monk/idle.png',         FRAME);
     this.load.spritesheet('monk-rangeattack',  'assets/characters/corrupted-monk/range-attack.png', FRAME);
+
+    // ── Narapichas (Stage 2 goon) ────────────────────────────────────────────
+    this.load.spritesheet('narapichas-run',    'assets/goons/narapichas/narapichasrun.png', FRAME);
+    this.load.spritesheet('narapichas-attack', 'assets/goons/narapichas/narapichas.png',    FRAME);
     // Purple orb: 1408×128 → 11 frames of 128×128. Frames 0–6 travel, 8–10 impact.
     this.load.spritesheet('purple-projectile', 'assets/characters/corrupted-monk/purple_projectile_spritesheet.png',
       { frameWidth: 128, frameHeight: 128 });
+
+    // ── Corrupted Snow Leopard (Stage 3 goon) ────────────────────────────────
+    this.load.spritesheet('leopard-run',   'assets/goons/corrupted-snow-leopard/run.png',  FRAME);
+    this.load.spritesheet('leopard-bite',  'assets/goons/corrupted-snow-leopard/bite.png', FRAME);
+
+    // ── Yeti King (Stage 3 final boss) ───────────────────────────────────────
+    // range-attack.png supplies both the idle (its calm opening frames) and
+    // the ground-slam blizzard cast. normal-attack.png is the close-range
+    // swing. run.png is the lumbering-approach animation.
+    this.load.spritesheet('yeti-rangeattack', 'assets/characters/yeti/range-attack.png',  FRAME);
+    this.load.spritesheet('yeti-attack',      'assets/characters/yeti/normal-attack.png', FRAME);
+    this.load.spritesheet('yeti-run',         'assets/characters/yeti/run.png',           FRAME);
 
     this.load.on('progress', (v) => {
       // Future: show loading bar here

@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import Player from '../entities/Player.js';
+import Narapichas from '../entities/enemies/Narapichas.js';
 import CorruptedMonk from '../entities/bosses/CorruptedMonk.js';
 import Projectile from '../entities/Projectile.js';
+import { STAGE2_WAVES } from '../config/waves2.js';
 import { setCameraBounds } from '../utils/cameraBounds.js';
 import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
@@ -36,6 +38,10 @@ const DECK_Y       = FLOOR_Y + PLAYER_SINK;
 const BOSS_TRIGGER_X = 3600;
 const BOSS_SPAWN_X   = 4400;
 
+// UIScene shows "BOSS FIGHT" when waveNum === total, so the boss counts as
+// one extra "wave" beyond the Narapichas waves for banner numbering.
+const TOTAL_WAVE_COUNT = STAGE2_WAVES.length + 1;
+
 export default class Stage2Scene extends Phaser.Scene {
   constructor() {
     super('Stage2Scene');
@@ -45,20 +51,32 @@ export default class Stage2Scene extends Phaser.Scene {
     this._boss        = null;
     this._bossSpawned = false;
 
+    this._enemies     = [];
+    this._waveActive  = false;
+    this._waveBarrier = null;
+
+    // Resume from the last cleared wave after a death (registry survives the
+    // scene.restart) — cleared waves' enemies never respawn.
+    this._checkpoint = this.registry.get('checkpoint:Stage2Scene') || null;
+    this._waveIndex  = this._checkpoint ? this._checkpoint.waveIndex : 0;
+
     this.physics.world.setBounds(0, 0, LEVEL_WIDTH, GAME_HEIGHT);
 
     this._buildBackground();
     this._buildPlatforms();   // sets this._floor
 
-    // Respawn at the bridge's end after dying to the boss (registry survives restart).
-    const cp = this.registry.get('checkpoint:Stage2Scene');
-    this._player = new Player(this, cp ? cp.x : 150, FLOOR_Y - 73);
+    const spawnX = this._checkpoint ? this._checkpoint.x : 150;
+    this._player = new Player(this, spawnX, FLOOR_Y - 73);
     this._player.floorY = FLOOR_Y;
     this.physics.add.collider(this._player, this._floor);
 
     setCameraBounds(this, LEVEL_WIDTH, GAME_HEIGHT);
     this.cameras.main.startFollow(this._player, true, 0.1, 0.05);
     this.cameras.main.setDeadzone(80, 120);
+
+    this._triggers = STAGE2_WAVES.map((wave) =>
+      this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
+    );
 
     this.events.once('bossDefeated', this._onBossDefeated, this);
 
@@ -77,7 +95,14 @@ export default class Stage2Scene extends Phaser.Scene {
 
   update(time, delta) {
     if (!this._player.alive) return;
-    this._player.update(delta, this._boss && this._boss.alive ? [this._boss] : []);
+
+    const liveEnemies = this._enemies.filter((e) => e.alive);
+    const targets = this._boss && this._boss.alive ? [...liveEnemies, this._boss] : liveEnemies;
+    this._player.update(delta, targets);
+
+    this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
+    this._checkTriggers();
+    this._cullDeadEnemies();
 
     // Spawn the final boss once the player reaches the end of the bridge.
     if (!this._bossSpawned && this._player.x >= BOSS_TRIGGER_X) {
@@ -89,12 +114,70 @@ export default class Stage2Scene extends Phaser.Scene {
     }
   }
 
+  _checkTriggers() {
+    if (this._waveActive || this._waveIndex >= STAGE2_WAVES.length) return;
+    const trigger = this._triggers[this._waveIndex];
+    if (!trigger?.active) return;
+    if (this._player.x >= trigger.x) {
+      trigger.destroy();
+      this._activateWave(this._waveIndex);
+    }
+  }
+
+  _activateWave(index) {
+    this._waveActive = true;
+    const waveDef    = STAGE2_WAVES[index];
+
+    const barrierX = waveDef.triggerX + 200;
+    this._waveBarrier = this.add.zone(barrierX, GAME_HEIGHT / 2, 20, GAME_HEIGHT);
+    this.physics.add.existing(this._waveBarrier, true);
+    this.physics.add.collider(this._player, this._waveBarrier);
+
+    waveDef.enemies.forEach(({ type, x, y }) => {
+      const enemy = this._spawnEnemy(type, x, y);
+      if (enemy) this._enemies.push(enemy);
+    });
+
+    this.events.emit('waveStarted', index + 1, TOTAL_WAVE_COUNT);
+  }
+
+  _spawnEnemy(type, x, y) {
+    let enemy;
+    switch (type) {
+      case 'narapichas': enemy = new Narapichas(this, x, y); break;
+      default: console.warn(`Unknown enemy type: ${type}`); return null;
+    }
+    this.physics.add.collider(enemy, this._floor);
+    this.physics.add.collider(this._player, enemy);
+    return enemy;
+  }
+
+  _cullDeadEnemies() {
+    if (!this._waveActive) return;
+    const allDead = this._enemies.every((e) => !e.alive);
+    if (!allDead) return;
+
+    if (this._waveBarrier) { this._waveBarrier.destroy(); this._waveBarrier = null; }
+    this._enemies = [];
+    this._waveActive = false;
+    this._waveIndex++;
+    this.events.emit('waveCleared', this._waveIndex);
+
+    // Checkpoint: a death now respawns here, not at the stage start — and the
+    // Narapichas from cleared waves never spawn again.
+    this.registry.set('checkpoint:Stage2Scene', {
+      waveIndex: this._waveIndex,
+      x: Phaser.Math.Clamp(this._player.x, 150, LEVEL_WIDTH - 300),
+    });
+    this.events.emit('checkpoint');
+  }
+
   _spawnBoss() {
     this._bossSpawned = true;
     this._boss = new CorruptedMonk(this, BOSS_SPAWN_X, FLOOR_Y - 55);
     this.physics.add.collider(this._boss, this._floor);
-    this.events.emit('waveStarted', 1, 1);   // shows the BOSS banner in the HUD
-    this.registry.set('checkpoint:Stage2Scene', { x: BOSS_TRIGGER_X - 200 });
+    this.events.emit('waveStarted', TOTAL_WAVE_COUNT, TOTAL_WAVE_COUNT);   // shows the BOSS banner in the HUD
+    this.registry.set('checkpoint:Stage2Scene', { waveIndex: this._waveIndex, x: BOSS_TRIGGER_X - 200 });
     this.events.emit('checkpoint');
   }
 

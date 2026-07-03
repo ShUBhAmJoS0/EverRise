@@ -180,6 +180,81 @@ export const ANIM_CONFIG = {
     },
   },
 
+  // ── Narapichas (Stage 2 goon) ─────────────────────────────────────────────
+  // run    → polearm-in-hand sprint (full 25-frame sheet)
+  // attack → thrust/swing sheet: rows 1-2 (0-9) are the windup/ready stance,
+  //          rows 3-5 (10-24) are the actual axe/spear swing — trimmed to that.
+  narapichas: {
+    run: {
+      sheet: 'narapichas-run',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 16,
+      loop: true,
+    },
+    attack: {
+      sheet: 'narapichas-attack',
+      frames: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+      frameRate: 24,
+      loop: false,
+    },
+  },
+
+  // ── Corrupted Snow Leopard (Stage 3 goon) ───────────────────────────────────
+  // run  → frames 5-24 only: a consistent crouched-sprint cycle with real
+  //        stride variation. Frames 0-4 are an almost-static standing pose —
+  //        including them caused a visible "pop" every loop, so they're cut.
+  // bite → frames 0-9 only: a clean snarl-and-chomp. Frames 10-24 have a
+  //        doubled/ghosted render artifact from the sheet generation — skipped.
+  leopard: {
+    run: {
+      sheet: 'leopard-run',
+      frames: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 20,
+      loop: true,
+    },
+    bite: {
+      sheet: 'leopard-bite',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      frameRate: 26,
+      loop: false,
+    },
+  },
+
+  // ── Yeti King (Stage 3 final boss) ──────────────────────────────────────────
+  // idle        → frames 0-1 of the range-attack sheet (calm staff-planted
+  //               stance before the charge).
+  // run         → full 25-frame lumbering-approach cycle.
+  // rangeattack → full 25-frame ground-slam. The frost burst first appears at
+  //               frame 5, which is where the blizzard triggers (see YetiKing.js).
+  // attack      → normal-attack sheet, trimmed to the raise-swing-plant motion;
+  //               the staff/mace connects around local index 6.
+  yeti: {
+    idle: {
+      sheet: 'yeti-rangeattack',
+      frames: [0, 1],
+      frameRate: 3,
+      loop: true,
+    },
+    run: {
+      sheet: 'yeti-run',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 16,
+      loop: true,
+    },
+    rangeattack: {
+      sheet: 'yeti-rangeattack',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 14,
+      loop: false,
+    },
+    attack: {
+      sheet: 'yeti-attack',
+      frames: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+      frameRate: 16,
+      loop: false,
+    },
+  },
+
   // ── Purple Projectile (Monk's orb) ──────────────────────────────────────────
   // travel → 7 frames (0–6) looped; impact → frames 8,9,10 one-shot.
   purple: {
