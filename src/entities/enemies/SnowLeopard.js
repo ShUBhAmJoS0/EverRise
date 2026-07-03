@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
 import Audio from '../../systems/AudioManager.js';
-import { shake, impactSparks } from '../../systems/fx.js';
+import { shake, impactSparks, dustBurst } from '../../systems/fx.js';
 
 // A corrupted snow leopard — fast, low-slung predator that stalks the player
 // across the glacier and lunges in with a snarling bite at close range.
@@ -101,15 +101,28 @@ export default class SnowLeopard extends Enemy {
 
   onDeath() {
     this._dying = true;
-    this.body.setVelocityX(0);
 
-    // No death sheet — fade out as a stand-in.
-    this.scene.tweens.add({
-      targets: this,
-      alpha: 0,
-      angle: -70,
-      duration: 500,
-      onComplete: () => this.destroy(),
+    // No death sheet — instead of hanging weightless mid-tip, give the kill
+    // some physicality: Enemy.die() just disabled gravity, so turn it back
+    // on and knock the body backward off its feet (away from whichever way
+    // it was facing) to let it drop onto the floor collider like a real
+    // carcass, then settle and fade. No rotation — any tilt/spin here
+    // reads as the body flipping upside down, which looks wrong.
+    this.body.setAllowGravity(true);
+    const knockDir = this.flipX ? 1 : -1;
+    this.body.setVelocity(knockDir * 110, -210);
+
+    this.scene.time.delayedCall(450, () => {
+      if (!this.scene) return;
+      this.body.setVelocity(0, 0);
+      dustBurst(this.scene, this.x, this.body.bottom);
+
+      this.scene.tweens.add({
+        targets: this,
+        alpha: 0,
+        duration: 350,
+        onComplete: () => this.destroy(),
+      });
     });
   }
 }

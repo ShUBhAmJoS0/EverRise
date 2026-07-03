@@ -64,6 +64,13 @@ export default class YetiKing extends Enemy {
     // other enemy in this stage — no hand-picked spawn Y needed.
     this.body.setSize(140, 138);
     this.body.setOffset(60, 55);
+    // `pushable`, unlike `immovable`, only affects the velocity/position
+    // exchange in dynamic-vs-dynamic separation (player collider) — it
+    // doesn't touch the dynamic-vs-static floor collider, so it doesn't
+    // trigger the immovable-vs-immovable deadlock described above. Result:
+    // the player still collides with him (can't walk through) but can't
+    // shove him around.
+    this.body.pushable = false;
 
     this._meleeCooldown    = 0;
     this._blizzardCooldown = YETI_BLIZZARD_COOLDOWN * 0.5;   // shorter first wait
@@ -87,12 +94,23 @@ export default class YetiKing extends Enemy {
     this.setFlipX(artFacesLeft ? !playerOnLeft : playerOnLeft);
   }
 
+  // Victory pose: once the killing blow lands, stop tracking the fallen
+  // player (Stage3Scene halts all updates the instant the player dies, so
+  // this is the last facing that will ever render) and turn to face right.
+  _faceRight() {
+    const artFacesLeft = LEFT_FACING_ANIMS.has(this.anims.currentAnim?.key);
+    this.setFlipX(artFacesLeft);
+  }
+
   updateBehavior(player, delta) {
     if (!this.alive || this._dying) return;
 
-    this._faceTowardPlayer(player);
-
+    // Facing is set once when an attack starts (see _startMelee/_startBlizzard)
+    // and held for its duration — re-facing every frame here would spin the
+    // sprite mid-swing/mid-cast if the player crosses to the other side.
     if (this._attacking) return;
+
+    this._faceTowardPlayer(player);
 
     this._meleeCooldown    -= delta;
     this._blizzardCooldown -= delta;
@@ -147,6 +165,7 @@ export default class YetiKing extends Enemy {
         player.takeDamage(YETI_MELEE_DMG);
         shake(this.scene, 110, 0.005);
         Audio.play('hit');
+        if (!player.alive) this._faceRight();
       }
     });
 
@@ -163,6 +182,7 @@ export default class YetiKing extends Enemy {
     this.body.setVelocityX(0);
 
     this.play('yeti-rangeattack', true);
+    this._faceTowardPlayer(player);   // re-face now that facing is frozen for the cast's duration
 
     // Unleash the storm when the cast reaches the frost-burst frame.
     const onUpdate = (anim, frame) => {
@@ -183,7 +203,12 @@ export default class YetiKing extends Enemy {
   // Slams the staff into the ground: the whole screen is scoured by a driving
   // blizzard — wind-blown snow streaking sideways — for a couple seconds.
   _unleashBlizzard(player) {
+    // Guard against a killing blow landing mid-windup: the animationupdate
+    // listener that calls this isn't stopped on death (see onDeath), so
+    // without this check a dead boss could still land the AOE hit.
+    if (!this.alive) return;
     player.takeDamage(YETI_BLIZZARD_DMG);
+    if (!player.alive) this._faceRight();
     shake(this.scene, 350, 0.01);
     Audio.play('hurt');
     this.scene.cameras.main.flash(220, 225, 240, 255);
@@ -261,6 +286,10 @@ export default class YetiKing extends Enemy {
   onDeath() {
     this._dying = true;
     this.body.setVelocityX(0);
+    // Stop mid-cast so a queued blizzard/melee animationupdate or
+    // animationcomplete callback can't fire after death.
+    this.anims.stop();
+    this.removeAllListeners('animationupdate');
 
     this.scene.tweens.add({
       targets: this,
