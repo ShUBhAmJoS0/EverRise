@@ -6,6 +6,7 @@ import { STAGE3_WAVES } from '../config/waves3.js';
 import { setCameraBounds } from '../utils/cameraBounds.js';
 import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
+import { addStartCave } from '../systems/caves.js';
 
 // ── Stage 3: Frozen Glacier ──────────────────────────────────────────────────
 // Scrolling icy background + seamless ice-shelf platform with a walkable player.
@@ -73,6 +74,9 @@ export default class Stage3Scene extends Phaser.Scene {
     setCameraBounds(this, LEVEL_WIDTH, GAME_HEIGHT);
     this.cameras.main.startFollow(this._player, true, 0.1, 0.05);
     this.cameras.main.setDeadzone(80, 120);
+
+    // The hero emerges from the glacier cave into the final frozen stage.
+    addStartCave(this, 'cave-stage3', 95, FLOOR_Y + 60, 1.0);
 
     this._triggers = STAGE3_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)

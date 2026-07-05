@@ -10,6 +10,7 @@ import { setCameraBounds } from '../utils/cameraBounds.js';
 import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
 import { runDialogue, say } from '../systems/dialogue.js';
+import { addStartCave, addEndCave } from '../systems/caves.js';
 import { impactSparks } from '../systems/fx.js';
 import Audio from '../systems/AudioManager.js';
 import Yarsagumba from '../entities/pickups/Yarsagumba.js';
@@ -65,6 +66,15 @@ export default class Stage1Scene extends Phaser.Scene {
     this.cameras.main.startFollow(this._player, true, 0.1, 0.05);
     this.cameras.main.setDeadzone(80, 120);
 
+    // Caves: the hero emerges from the forest cave at the start, and the snowy
+    // mountain cave at the far end is the way onward to Stage 2.
+    const CAVE_Y = FLOOR_Y + 55;
+    addStartCave(this, 'cave-stage1', 80, CAVE_Y, 1.0);
+    this._endCave = addEndCave(this, 'cave-stage2-out', 4820, CAVE_Y, {
+      scale: 1.0,
+      onEnter: () => this._enterEndCave(),
+    });
+
     this._triggers = STAGE1_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
     );
@@ -106,6 +116,7 @@ export default class Stage1Scene extends Phaser.Scene {
     this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
     Enemy.separate(this._enemies);
     this._yarsa?.update(this._player);
+    this._endCave?.update(this._player);
     this._checkTriggers();
     this._checkTransientAdvance();
     this._cullDeadEnemies();
@@ -280,9 +291,21 @@ export default class Stage1Scene extends Phaser.Scene {
   }
 
   _onBossDefeated() {
+    // The witch has fallen — the mountain cave beyond now beckons. Instead of an
+    // instant cut, the player walks into the cave to travel onward.
+    this.time.delayedCall(1400, () => {
+      if (!this._player.active) return;
+      this._endCave.arm();
+      say(this, this._player, 'The witch is vanquished. The mountain path lies beyond...', 3600);
+    });
+  }
+
+  _enterEndCave() {
     this.registry.remove('checkpoint:Stage1Scene');   // fresh start next visit
     this.registry.remove(YARSA_KEY);
-    this.time.delayedCall(1500, () => {
+    this._player.inputLocked = true;
+    this.cameras.main.fadeOut(600, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop('UIScene');
       this.scene.start('StageCompleteScene');
     });

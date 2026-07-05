@@ -17,6 +17,12 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('stage3-bg', 'assets/backgrounds/stage3/stage3_background.png');
     this.load.image('stage3-platform', 'assets/platforms/stage3/stage3_platform.png');
 
+    // ── Cave entrances / exits (themed per biome) ───────────────────────────
+    this.load.image('cave-stage1',     'assets/cave/stage1/right_facing_cave_stage1.png');
+    this.load.image('cave-stage2-in',  'assets/cave/stage2/right_facing_cave_stage2.png');
+    this.load.image('cave-stage2-out', 'assets/cave/stage2/left_facing_cave_stage2.png');
+    this.load.image('cave-stage3',     'assets/cave/stage3/right_facing_cave_stage3.png');
+
     // ── Main Character ─────────────────────────────────────────────────────────
     const FRAME = { frameWidth: 256, frameHeight: 256 };
     this.load.spritesheet('player-idle',   'assets/characters/main-character/idle.png',         FRAME);

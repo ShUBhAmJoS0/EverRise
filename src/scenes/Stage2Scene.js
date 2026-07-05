@@ -7,6 +7,8 @@ import { STAGE2_WAVES } from '../config/waves2.js';
 import { setCameraBounds } from '../utils/cameraBounds.js';
 import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
+import { addStartCave, addEndCave } from '../systems/caves.js';
+import { say } from '../systems/dialogue.js';
 
 // ── Stage 2: Frozen Mountain Ruins ──────────────────────────────────────────
 // For now this scene sets up the scrolling background and the stone-bridge
@@ -74,6 +76,15 @@ export default class Stage2Scene extends Phaser.Scene {
     this.cameras.main.startFollow(this._player, true, 0.1, 0.05);
     this.cameras.main.setDeadzone(80, 120);
 
+    // Caves: emerge from the snowy mountain cave; the glacier cave beyond leads
+    // onward to Stage 3.
+    const CAVE_Y = FLOOR_Y + 60;
+    addStartCave(this, 'cave-stage2-in', 90, CAVE_Y, 1.0);
+    this._endCave = addEndCave(this, 'cave-stage3', 4900, CAVE_Y, {
+      scale: 1.0, flip: true,
+      onEnter: () => this._enterEndCave(),
+    });
+
     this._triggers = STAGE2_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
     );
@@ -112,6 +123,8 @@ export default class Stage2Scene extends Phaser.Scene {
     if (this._boss && this._boss.active) {
       this._boss.updateBehavior(this._player, delta);
     }
+
+    this._endCave?.update(this._player);
   }
 
   _checkTriggers() {
@@ -195,14 +208,21 @@ export default class Stage2Scene extends Phaser.Scene {
   }
 
   _onBossDefeated() {
+    // Monk defeated — the glacier cave onward now beckons; walk into it.
+    this.time.delayedCall(1300, () => {
+      if (!this._player.active) return;
+      this._endCave.arm();
+      say(this, this._player, 'The corruption recedes. The glacier awaits beyond...', 3600);
+    });
+  }
+
+  _enterEndCave() {
     this.registry.remove('checkpoint:Stage2Scene');
-    // Brief fade, then advance to Stage 3.
-    this.time.delayedCall(1200, () => {
-      this.cameras.main.fadeOut(600, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.stop('UIScene');
-        this.scene.start('Stage3Scene');
-      });
+    this._player.inputLocked = true;
+    this.cameras.main.fadeOut(600, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.stop('UIScene');
+      this.scene.start('Stage3Scene');
     });
   }
 
