@@ -55,18 +55,13 @@ export default class UIScene extends Phaser.Scene {
     this._bossBarW = bw;
     this._bossBarX = bx;
 
-    // ── Checkpoint toast ───────────────────────────────────────────────────────
-    this._checkpointText = this.add.text(this.scale.width / 2, 74, '✓ Checkpoint', {
-      fontSize: '17px', fill: '#9fe6a0', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(12).setAlpha(0);
-
     this._stage1.events.on('playerHealthChanged', this._updateHealthBar, this);
     this._stage1.events.on('waveStarted', this._showWaveLabel, this);
     this._stage1.events.on('waveCleared', this._onWaveCleared, this);
     this._stage1.events.on('ambush', this._showAmbush, this);
     this._stage1.events.on('bossSpawned', this._showBossBar, this);
     this._stage1.events.on('bossHealthChanged', this._updateBossBar, this);
-    this._stage1.events.on('checkpoint', this._showCheckpoint, this);
+    this._stage1.events.on('playerDied', this._hideBossBar, this);
 
     // Seed the bar from the live player so it's correct on the very first frame.
     const p = this._stage1?._player;
@@ -101,9 +96,19 @@ export default class UIScene extends Phaser.Scene {
   }
 
   _showBossBar(name, hp, maxHp) {
+    [this._bossName, this._bossBarBorder, this._bossBarBg, this._bossBar]
+      .forEach((r) => { this.tweens.killTweensOf(r); r.setAlpha(1); });
     this._bossName.setText(name).setVisible(true);
     [this._bossBarBorder, this._bossBarBg, this._bossBar].forEach((r) => r.setVisible(true));
     this._updateBossBar(hp, maxHp);
+  }
+
+  // Hide the boss bar (player died) so it can't linger into the next attempt.
+  _hideBossBar() {
+    [this._bossName, this._bossBarBorder, this._bossBarBg, this._bossBar].forEach((r) => {
+      this.tweens.killTweensOf(r);
+      r.setVisible(false).setAlpha(1);
+    });
   }
 
   _updateBossBar(hp, maxHp) {
@@ -119,12 +124,6 @@ export default class UIScene extends Phaser.Scene {
           .forEach((r) => r.setVisible(false).setAlpha(1)),
       });
     }
-  }
-
-  _showCheckpoint() {
-    this._checkpointText.setAlpha(1).setScale(1.15);
-    this.tweens.add({ targets: this._checkpointText, scale: 1, duration: 200 });
-    this.tweens.add({ targets: this._checkpointText, alpha: 0, delay: 1300, duration: 500 });
   }
 
   // Sudden red flash for a snake ambush (no calm "Wave X" banner).
@@ -145,7 +144,7 @@ export default class UIScene extends Phaser.Scene {
       this._stage1.events.off('ambush', this._showAmbush, this);
       this._stage1.events.off('bossSpawned', this._showBossBar, this);
       this._stage1.events.off('bossHealthChanged', this._updateBossBar, this);
-      this._stage1.events.off('checkpoint', this._showCheckpoint, this);
+      this._stage1.events.off('playerDied', this._hideBossBar, this);
     }
   }
 }

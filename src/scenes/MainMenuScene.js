@@ -33,10 +33,12 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   _startNew() {
-    // Fresh run: drop any mid-stage checkpoints/pickups from a previous attempt.
-    this.registry.remove('checkpoint:Stage1Scene');
-    this.registry.remove('checkpoint:Stage2Scene');
-    this.registry.remove('yarsa:Stage1');
+    // Fresh run: drop pickups and every story flag from a previous attempt so the
+    // whole story (chapter cards, intros, the pendant beat) plays again.
+    [
+      'yarsa:Stage1', 'pendantGiven:Stage1',
+      'introSeen:Stage1', 'introSeen:Stage2', 'introSeen:Stage3',
+    ].forEach((k) => this.registry.remove(k));
     SaveManager.recordStageReached(1);
     this._launchStage('Stage1Scene');
   }

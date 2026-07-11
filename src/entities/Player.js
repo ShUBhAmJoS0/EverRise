@@ -114,6 +114,8 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this._wasOnGround    = true;
     this._healthEmitted  = false;
     this.inputLocked     = false;   // true during story dialogue — stand still
+    this._scriptTargetX  = null;    // set during cave walk-in/out cutscenes
+    this._scriptOnArrive = null;
     this._timers         = [];
     this._stones         = [];
 
@@ -168,6 +170,14 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this._jumpCutDone && !this.controls.jumpHeld && this.body.velocity.y < JUMP_CUT_MIN_VY) {
       this.body.setVelocityY(this.body.velocity.y * JUMP_CUT_MULT);
       this._jumpCutDone = true;
+    }
+
+    // Scripted cutscene walk (cave entrance/exit): drive movement, ignore input.
+    if (this._scriptTargetX !== null) {
+      this._updateScriptedWalk();
+      this._updateStones(enemies);
+      this._clampToFloor();
+      return;
     }
 
     // Story dialogue: stand still and listen (physics/anims keep running).
@@ -450,6 +460,54 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     if (landed) { hitStop(this.scene, 55); shake(this.scene, 70, 0.0035); Audio.play('hit'); }
   }
 
+  // ── Scripted walk (cave entrance/exit cutscenes) ─────────────────────────────
+  // Drive the hero on a scripted walk to targetX, ignoring player input;
+  // onArrive() fires once when he reaches it.
+  startScriptedWalk(targetX, onArrive = null) {
+    this._scriptTargetX  = targetX;
+    this._scriptOnArrive = onArrive;
+    this.inputLocked     = true;
+  }
+
+  _updateScriptedWalk() {
+    const remaining = this._scriptTargetX - this.x;
+    if (Math.abs(remaining) <= 5) {
+      this.body.setVelocityX(0);
+      this._playAnim('player-idle');
+      const cb = this._scriptOnArrive;
+      this._scriptTargetX  = null;
+      this._scriptOnArrive = null;
+      cb?.();
+      return;
+    }
+    const dir = remaining < 0 ? -1 : 1;
+    this.setFlipX(dir < 0);
+    this.body.setVelocityX(dir * PLAYER_SPEED * 0.8);
+    this._playAnim('player-run');
+  }
+
+  // Freeze cleanly for a story beat. Cancels any in-progress action first so that
+  // locking input mid-attack or mid-Guleli-charge can't leave the hero stuck
+  // (frozen, or shrunk at the Guleli scale). Call in place of `inputLocked = true`.
+  enterCutscene() {
+    this._clearTimers();
+    this._isAttacking = false;
+    this._isCharging  = false;
+    this._isDodging   = false;
+    this._chargeMaxed = false;
+    this.setScale(PLAYER_SCALE);
+    this.clearTint();
+    this.setAlpha(1);
+    if (this.body) this.body.setVelocity(0, 0);
+    this.inputLocked = true;
+    this._playAnim('player-idle');
+  }
+
+  // Hand control back after a story beat.
+  exitCutscene() {
+    this.inputLocked = false;
+  }
+
   // Permanent growth (e.g. eating Yarsagumba): raise the cap and heal.
   increaseMaxHp(amount, heal = 0) {
     this.maxHp += amount;
@@ -474,6 +532,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
   _die() {
     this.alive = false;
+    this.scene.events.emit('playerDied');   // HUD hides the boss bar so it can't linger
     this._clearTimers();
     this.body.setVelocity(0, 0);
     this.body.setAllowGravity(false);

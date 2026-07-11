@@ -18,6 +18,8 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('stage3-platform', 'assets/platforms/stage3/stage3_platform.png');
 
     // ── Cave entrances / exits (themed per biome) ───────────────────────────
+    // -out = left-facing mouth (walk OUT of it, stage start); -in = right-facing
+    // mouth (walk INTO it, stage end).
     this.load.image('cave-stage1',     'assets/cave/stage1/right_facing_cave_stage1.png');
     this.load.image('cave-stage2-in',  'assets/cave/stage2/right_facing_cave_stage2.png');
     this.load.image('cave-stage2-out', 'assets/cave/stage2/left_facing_cave_stage2.png');
@@ -136,51 +138,76 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // A muted jungle snake (olive/dark-green with darker bands) facing right: a
-  // mostly low, slithering body with a slightly raised head, amber eye and a
-  // forked tongue. Tones picked to sit naturally against the forest. Flip for left.
+  // A realistic jungle pit-viper facing right: a thick, countershaded body coiled
+  // in a natural S, tapering to a fine tail and a constricted neck, then a broad
+  // wedge-shaped head with a heat-pit, amber slit-pupil eye and a flicking forked
+  // tongue. Dark-olive dorsal / pale belly so it reads against the forest. Flip
+  // for left. Texture dims kept (184×96) so Snake.js body tuning is unchanged.
   _makeSnakeTexture() {
     const W = 184, H = 96, midY = 60;
     const g = this.make.graphics({ x: 0, y: 0, add: false });
-    const segs = 96, x0 = 14, len = 142;
-    // Low slither with a gentle rise into the head at the right.
-    const pathY = (t) => midY + Math.sin(t * Math.PI * 2.3) * 11 * (1 - t * 0.45) - Math.pow(t, 2.6) * 26;
-    const rad   = (t) => 2.5 + 9.5 * Math.pow(t, 0.8);   // smooth taper, thicker sooner
-    const px    = (t) => x0 + len * t;
-    const draw = (rFn, color, alpha = 1, dy = 0) => {
+    const segs = 150, x0 = 12, len = 122;   // leaves room at right for the head + tongue
+    const px = (t) => x0 + len * t;
+
+    // Serpentine spine: two humps that grow toward the head, which lifts up.
+    const spineY = (t) =>
+      midY + Math.sin(t * Math.PI * 2.2) * 12 * (0.4 + 0.6 * t) - Math.pow(t, 2.6) * 30;
+    // Thickest through the mid-body, tapering to a thin tail (t→0) AND a pinched
+    // neck (t→~0.9) so the broad head reads as separate — real snake silhouette.
+    const bodyR = (t) => 2.4 + 10.5 * Math.pow(Math.sin(Math.min(t, 0.92) * Math.PI), 0.62);
+
+    const band = (rFn, color, alpha = 1, dyFn = null) => {
       g.fillStyle(color, alpha);
-      for (let i = 0; i <= segs; i++) { const t = i / segs; g.fillCircle(px(t), pathY(t) + dy, rFn(t)); }
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        g.fillCircle(px(t), spineY(t) + (dyFn ? dyFn(t) : 0), rFn(t));
+      }
     };
-    draw((t) => rad(t) + 1.6, 0x232d14);                       // dark outline
-    draw((t) => rad(t),       0x5d6b32);                       // olive body
-    draw((t) => rad(t) * 0.62, 0x46531f, 1, -1.5);             // darker dorsal (top) tone
-    draw((t) => rad(t) * 0.42, 0x93a35c, 0.7, 2.5);            // pale ventral (belly) tone
-    // dorsal diamond markings down the spine
-    g.fillStyle(0x2c3a16, 0.95);
-    for (let i = 6; i <= segs - 6; i += 8) {
-      const t = i / segs;
-      g.fillEllipse(px(t), pathY(t) - rad(t) * 0.35, rad(t) * 1.05, rad(t) * 0.6);
+
+    // Layered, countershaded body.
+    band((t) => bodyR(t) + 2,    0x121c0b);                             // dark outline
+    band((t) => bodyR(t),        0x5a7233);                             // olive base
+    band((t) => bodyR(t) * 0.66, 0x39501e, 1, (t) => -bodyR(t) * 0.42); // dark dorsal (top)
+    band((t) => bodyR(t) * 0.40, 0xa4b56e, 0.9, (t) => bodyR(t) * 0.52);// pale belly (bottom)
+
+    // Dorsal saddle blotches — dark hourglass markings marching down the spine.
+    for (let i = 9; i <= segs - 14; i += 12) {
+      const t = i / segs, r = bodyR(t), cx = px(t), cy = spineY(t);
+      g.fillStyle(0x223212, 0.95); g.fillEllipse(cx, cy - r * 0.32, r * 1.25, r * 0.78);
+      g.fillStyle(0x0f180a, 0.5);  g.fillEllipse(cx, cy - r * 0.32, r * 1.25, r * 0.82); // dark edge hint
+      g.fillStyle(0x223212, 1);    g.fillEllipse(cx, cy - r * 0.30, r * 1.0,  r * 0.62);
     }
-    g.fillStyle(0xb9c37c, 0.5);
-    for (let i = 10; i <= segs - 6; i += 8) {
+    // Keeled-scale sheen — a fine highlight running along the upper back.
+    g.fillStyle(0xcad98c, 0.45);
+    for (let i = 5; i <= segs - 10; i += 4) {
       const t = i / segs;
-      g.fillCircle(px(t), pathY(t) - rad(t) * 0.15, 1.3);      // scale glints
+      g.fillCircle(px(t), spineY(t) - bodyR(t) * 0.5, 0.9);
     }
-    // Head: rounded skull flowing into a snout, brow ridge, slit eye, tongue
-    const hx = px(1), hy = pathY(1);
-    g.fillStyle(0x232d14, 1); g.fillEllipse(hx + 5, hy, 34, 22);
-    g.fillStyle(0x5d6b32, 1); g.fillEllipse(hx + 4, hy, 29, 18);
-    g.fillStyle(0x46531f, 1); g.fillEllipse(hx + 2, hy - 4, 24, 9);    // darker crown
-    g.fillStyle(0x93a35c, 0.8); g.fillEllipse(hx + 8, hy + 6, 22, 6);  // pale jaw
-    g.fillStyle(0x232d14, 1); g.fillEllipse(hx + 17, hy + 1, 10, 9);   // snout
-    g.fillStyle(0x5d6b32, 1); g.fillEllipse(hx + 16, hy + 1, 7, 6);
-    g.fillStyle(0xd8b23e, 1); g.fillEllipse(hx + 9, hy - 4, 6, 5);     // amber eye
-    g.fillStyle(0x1a1206, 1); g.fillEllipse(hx + 10, hy - 4, 1.6, 4);  // vertical slit pupil
-    g.lineStyle(2, 0xa83028, 1);                                       // forked tongue
+
+    // ── Head: broad viper wedge, raised at the right ──────────────────────────
+    const hx = px(1), hy = spineY(1);
+    g.fillStyle(0x121c0b, 1); g.fillEllipse(hx + 7,  hy - 2, 42, 27);   // outline
+    g.fillStyle(0x5a7233, 1); g.fillEllipse(hx + 6,  hy - 2, 36, 22);   // head base
+    g.fillStyle(0x39501e, 1); g.fillEllipse(hx + 2,  hy - 7, 28, 11);   // dark crown
+    g.fillStyle(0xa4b56e, 0.85); g.fillEllipse(hx + 10, hy + 6, 26, 8); // pale lip/jaw line
+    // snout tip
+    g.fillStyle(0x121c0b, 1); g.fillEllipse(hx + 21, hy - 1, 13, 12);
+    g.fillStyle(0x5a7233, 1); g.fillEllipse(hx + 20, hy - 1, 9,  8);
+    g.fillStyle(0x1a1206, 1); g.fillCircle(hx + 25, hy - 2, 1.1);       // nostril
+    g.fillStyle(0x2a1c0a, 0.9); g.fillEllipse(hx + 16, hy + 1, 4, 2.4); // heat-pit
+    // eye: amber with vertical slit pupil, brow ridge + catchlight
+    g.fillStyle(0x223212, 1);  g.fillEllipse(hx + 9,  hy - 9, 10, 6);   // brow ridge
+    g.fillStyle(0xd6a12b, 1);  g.fillEllipse(hx + 10, hy - 5, 7,  6);   // amber eye
+    g.fillStyle(0x120c03, 1);  g.fillEllipse(hx + 11, hy - 5, 1.7, 5);  // slit pupil
+    g.fillStyle(0xffeaa6, 0.9); g.fillCircle(hx + 8.2, hy - 6.6, 1);    // catchlight
+    // flicking forked tongue
+    g.lineStyle(2, 0xc0352a, 1);
     g.beginPath();
-    g.moveTo(hx + 21, hy + 2); g.lineTo(hx + 36, hy - 2);
-    g.moveTo(hx + 30, hy + 0.8); g.lineTo(hx + 36, hy + 5);
+    g.moveTo(hx + 26, hy + 1); g.lineTo(hx + 38, hy - 3);   // stem
+    g.moveTo(hx + 38, hy - 3); g.lineTo(hx + 46, hy - 7);   // upper fork
+    g.moveTo(hx + 38, hy - 3); g.lineTo(hx + 46, hy + 1);   // lower fork
     g.strokePath();
+
     g.generateTexture('snake', W, H);
     g.destroy();
   }
