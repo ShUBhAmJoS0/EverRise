@@ -3,10 +3,20 @@ import Player from '../entities/Player.js';
 import SnowLeopard from '../entities/enemies/SnowLeopard.js';
 import YetiKing from '../entities/bosses/YetiKing.js';
 import { STAGE3_WAVES } from '../config/waves3.js';
-import { setCameraBounds } from '../utils/cameraBounds.js';
+import { setCameraBounds, followPlayerAhead } from '../utils/cameraBounds.js';
 import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
-import { addStartCave } from '../systems/caves.js';
+import { addStartCave, emergeFromCave } from '../systems/caves.js';
+import { runDialogue, storyTitle } from '../systems/dialogue.js';
+import Audio from '../systems/AudioManager.js';
+
+// ── Story (Ch. III) — Sagarmatha. The corrupted lake at its heart is the source
+// of it all; the Yeti King guards the way. With the Heart of Sagarmatha, the hero
+// can finally end the corruption.
+const INTRO_LINES = [
+  { speaker: 'THE GUARDIAN', text: 'Sagarmatha. At its heart lies the corrupted lake — the source of it all.' },
+  { speaker: 'THE GUARDIAN', text: 'The Yeti King guards the way. With the Heart, I can end this. One last battle.' },
+];
 
 // ── Stage 3: Frozen Glacier ──────────────────────────────────────────────────
 // Scrolling icy background + seamless ice-shelf platform with a walkable player.
@@ -55,28 +65,39 @@ export default class Stage3Scene extends Phaser.Scene {
     this._waveActive  = false;
     this._waveBarrier = null;
     this._stageComplete = false;
-
-    // Resume from the last cleared wave after a death (registry survives the
-    // scene.restart) — cleared waves' enemies never respawn.
-    this._checkpoint = this.registry.get('checkpoint:Stage3Scene') || null;
-    this._waveIndex  = this._checkpoint ? this._checkpoint.waveIndex : 0;
+    this._waveIndex   = 0;
 
     this.physics.world.setBounds(0, 0, LEVEL_WIDTH, GAME_HEIGHT);
 
     this._buildBackground();
     this._buildPlatforms();   // sets this._floor
 
-    const spawnX = this._checkpoint ? this._checkpoint.x : 150;
-    this._player = new Player(this, spawnX, FLOOR_Y - 73);
+    this._player = new Player(this, 150, FLOOR_Y - 73);
     this._player.floorY = FLOOR_Y;
     this.physics.add.collider(this._player, this._floor);
 
     setCameraBounds(this, LEVEL_WIDTH, GAME_HEIGHT);
-    this.cameras.main.startFollow(this._player, true, 0.1, 0.05);
-    this.cameras.main.setDeadzone(80, 120);
+    followPlayerAhead(this, this._player);
+    this.cameras.main.fadeIn(500, 0, 0, 0);   // smooth blend in from Stage 2
 
-    // The hero emerges from the glacier cave into the final frozen stage.
-    addStartCave(this, 'cave-stage3', 95, FLOOR_Y + 60, 1.0);
+    // The hero walks OUT of the glacier cave into the final frozen stage. Seated
+    // low so the visible rock beds into the ice deck (~32px clear PNG padding
+    // otherwise reads as "hanging in the air").
+    const startCave = addStartCave(this, 'cave-stage3', 110, FLOOR_Y + 135, { scale: 1.0 });
+
+    // Chapter intro on the first visit: title card, emerge, then the dialogue.
+    if (!this.registry.get('introSeen:Stage3')) {
+      this.registry.set('introSeen:Stage3', true);
+      this._player.enterCutscene();
+      storyTitle(this, 'CHAPTER III', 'Sagarmatha').then(() => {
+        emergeFromCave(this, this._player, startCave, {
+          onDone: () => runDialogue(this, INTRO_LINES)
+            .then(() => { if (this._player.active) this._player.exitCutscene(); }),
+        });
+      });
+    } else {
+      emergeFromCave(this, this._player, startCave);
+    }
 
     this._triggers = STAGE3_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
@@ -105,12 +126,13 @@ export default class Stage3Scene extends Phaser.Scene {
     this._player.update(delta, targets);
 
     this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
-    this._checkTriggers();
+    // Don't trigger new waves during a story beat (intro emergence / boss beat).
+    if (!this._player.inputLocked) this._checkTriggers();
     this._cullDeadEnemies();
 
     // Spawn the final boss once both Leopard waves are cleared and the player
     // reaches the far end of the glacier.
-    if (!this._bossSpawned && this._waveIndex >= STAGE3_WAVES.length && this._player.x >= BOSS_TRIGGER_X) {
+    if (!this._player.inputLocked && !this._bossSpawned && this._waveIndex >= STAGE3_WAVES.length && this._player.x >= BOSS_TRIGGER_X) {
       this._spawnBoss();
     }
 
@@ -133,7 +155,9 @@ export default class Stage3Scene extends Phaser.Scene {
     this._waveActive = true;
     const waveDef    = STAGE3_WAVES[index];
 
-    const barrierX = waveDef.triggerX + 200;
+    // Seal the arena PAST the rightmost enemy so the player can flank them.
+    const rightmost = Math.max(...waveDef.enemies.map((e) => e.x));
+    const barrierX = rightmost + 320;
     this._waveBarrier = this.add.zone(barrierX, GAME_HEIGHT / 2, 20, GAME_HEIGHT);
     this.physics.add.existing(this._waveBarrier, true);
     this.physics.add.collider(this._player, this._waveBarrier);
@@ -153,7 +177,8 @@ export default class Stage3Scene extends Phaser.Scene {
       default: console.warn(`Unknown enemy type: ${type}`); return null;
     }
     this.physics.add.collider(enemy, this._floor);
-    this.physics.add.collider(this._player, enemy);
+    // No player↔enemy collider: the player can pass THROUGH/behind enemies to
+    // flank them (the wave barrier still seals the arena).
     return enemy;
   }
 
@@ -167,15 +192,6 @@ export default class Stage3Scene extends Phaser.Scene {
     this._waveActive = false;
     this._waveIndex++;
     this.events.emit('waveCleared', this._waveIndex);
-
-    // Checkpoint: a death now respawns here, not at the stage start — and the
-    // Snow Leopards from cleared waves never spawn again. (Clearing the final
-    // wave doesn't end the stage — the Yeti King fight still lies ahead.)
-    this.registry.set('checkpoint:Stage3Scene', {
-      waveIndex: this._waveIndex,
-      x: Phaser.Math.Clamp(this._player.x, 150, LEVEL_WIDTH - 300),
-    });
-    this.events.emit('checkpoint');
   }
 
   _spawnBoss() {
@@ -185,23 +201,62 @@ export default class Stage3Scene extends Phaser.Scene {
     // SnowLeopard, CorruptedMonk), rather than a hand-picked "final" Y.
     this._boss = new YetiKing(this, BOSS_SPAWN_X, FLOOR_Y - 150);
     this.physics.add.collider(this._boss, this._floor);
-    this.physics.add.collider(this._player, this._boss);
+    // No player↔boss collider: the player can slip behind the Yeti King to flank.
     this.events.emit('waveStarted', TOTAL_WAVE_COUNT, TOTAL_WAVE_COUNT);   // shows the BOSS banner
-    this.registry.set('checkpoint:Stage3Scene', { waveIndex: this._waveIndex, x: BOSS_TRIGGER_X - 200 });
-    this.events.emit('checkpoint');
   }
 
   _onBossDefeated() {
     if (this._stageComplete) return;
     this._stageComplete = true;
-    this.registry.remove('checkpoint:Stage3Scene');
-    // The Yeti King is EverRise's final boss — fade out to the credits roll.
-    this.time.delayedCall(1500, () => {
-      this.cameras.main.fadeOut(700, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.stop('UIScene');
-        this.scene.start('CreditsScene');
-      });
+    // Story finale: the hero returns the Heart of Sagarmatha to the corrupted
+    // lake, cleansing the mountains — then the credits roll.
+    this.time.delayedCall(1400, () => {
+      if (!this._player.active) { this._toCredits(); return; }
+      this._player.enterCutscene();
+      runDialogue(this, [
+        { speaker: 'THE GUARDIAN', text: 'It is over, great one. Rest now.' },
+        { speaker: 'THE GUARDIAN', text: 'The Heart of Sagarmatha — returned to the lake. Let the mountains be cleansed.' },
+      ]).then(() => this._purifyAndFinish());
+    });
+  }
+
+  // The Heart falls into the corrupted lake and a wave of purifying light spreads
+  // across the peak, lifting the corruption — the visual payoff of the whole story.
+  _purifyAndFinish() {
+    const px = this._player.x, py = FLOOR_Y + 40;
+    const heart = this.add.rectangle(this._player.x, this._player.y - 30, 26, 26, 0x6fe0ff, 1)
+      .setAngle(45).setDepth(50).setStrokeStyle(3, 0xffffff, 0.85);
+    this.tweens.add({
+      targets: heart, y: py, angle: 405, duration: 850, ease: 'Sine.in',
+      onComplete: () => {
+        heart.destroy();
+        Audio.play('shieldBreak');
+        this.cameras.main.flash(600, 200, 245, 255);
+        for (let i = 0; i < 3; i++) {
+          const ring = this.add.circle(px, py, 18, 0x9ff0ff, 0).setStrokeStyle(5, 0x9ff0ff, 0.9).setDepth(49);
+          this.tweens.add({
+            targets: ring, radius: 720, alpha: 0, duration: 1400, delay: i * 220, ease: 'Sine.out',
+            onComplete: () => ring.destroy(),
+          });
+        }
+        if (this.textures.exists('spark')) {
+          const p = this.add.particles(px, py, 'spark', {
+            speed: { min: 120, max: 430 }, angle: { min: 190, max: 350 }, lifespan: 1600,
+            scale: { start: 1, end: 0 }, alpha: { start: 0.9, end: 0 }, tint: 0xbff4ff, emitting: false,
+          }).setDepth(49);
+          p.explode(130);
+          this.time.delayedCall(1800, () => p.destroy());
+        }
+        this.time.delayedCall(1700, () => this._toCredits());
+      },
+    });
+  }
+
+  _toCredits() {
+    this.cameras.main.fadeOut(900, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.stop('UIScene');
+      this.scene.start('CreditsScene');
     });
   }
 

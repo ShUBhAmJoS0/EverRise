@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
 
-const WOLF_HP        = 100;
-const WOLF_SPEED     = 140;
-const WOLF_ATTACK_DMG = 10;
+const WOLF_HP        = 150;
+const WOLF_SPEED     = 200;
+const WOLF_ATTACK_DMG = 18;
 const WOLF_ATTACK_RANGE = 90;   // px: wolf walks up close before pouncing (no body collider to stop it)
-const WOLF_ATTACK_COOLDOWN = 1200; // ms between bites
+const WOLF_ATTACK_COOLDOWN = 850; // ms between bites
 
 export default class Wolf extends Enemy {
   constructor(scene, x, y) {

@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
 
-const MONK_HP            = 220;
-const MONK_SPEED         = 70;
+const MONK_HP            = 300;
+const MONK_SPEED         = 120;
 const MONK_ATTACK_RANGE  = 520;   // ranged caster — engages from far away
-const MONK_ATTACK_COOLDOWN = 2600; // ms between casts
+const MONK_ATTACK_COOLDOWN = 1500; // ms between casts
 const MONK_RELEASE_FRAME  = 13;   // 1-based frame where the purple orb leaves the staff
 
 // Stage 2 final boss. Charges a purple orb (13 frames of windup), launches it on

@@ -4,11 +4,19 @@ import Narapichas from '../entities/enemies/Narapichas.js';
 import CorruptedMonk from '../entities/bosses/CorruptedMonk.js';
 import Projectile from '../entities/Projectile.js';
 import { STAGE2_WAVES } from '../config/waves2.js';
-import { setCameraBounds } from '../utils/cameraBounds.js';
+import { setCameraBounds, followPlayerAhead } from '../utils/cameraBounds.js';
 import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
-import { addStartCave, addEndCave } from '../systems/caves.js';
-import { say } from '../systems/dialogue.js';
+import { addStartCave, addEndCave, emergeFromCave } from '../systems/caves.js';
+import { say, runDialogue, storyTitle, itemReward } from '../systems/dialogue.js';
+
+// ── Story (Ch. II) — the hero reaches the Himalayas; the corruption is worse and
+// even the mountain beasts have turned. The Corrupted Monk holds the Heart of
+// Sagarmatha, the sacred relic that can cleanse the corruption at its source.
+const INTRO_LINES = [
+  { speaker: 'THE GUARDIAN', text: 'The Himalayas at last. The corruption is stronger here — even the mountain beasts have turned.' },
+  { speaker: 'THE GUARDIAN', text: 'A monk has fallen to it, deep in these ruins. He may know where it all began.' },
+];
 
 // ── Stage 2: Frozen Mountain Ruins ──────────────────────────────────────────
 // For now this scene sets up the scrolling background and the stone-bridge
@@ -56,34 +64,46 @@ export default class Stage2Scene extends Phaser.Scene {
     this._enemies     = [];
     this._waveActive  = false;
     this._waveBarrier = null;
-
-    // Resume from the last cleared wave after a death (registry survives the
-    // scene.restart) — cleared waves' enemies never respawn.
-    this._checkpoint = this.registry.get('checkpoint:Stage2Scene') || null;
-    this._waveIndex  = this._checkpoint ? this._checkpoint.waveIndex : 0;
+    this._waveIndex   = 0;
 
     this.physics.world.setBounds(0, 0, LEVEL_WIDTH, GAME_HEIGHT);
 
     this._buildBackground();
     this._buildPlatforms();   // sets this._floor
 
-    const spawnX = this._checkpoint ? this._checkpoint.x : 150;
-    this._player = new Player(this, spawnX, FLOOR_Y - 73);
+    this._player = new Player(this, 150, FLOOR_Y - 73);
     this._player.floorY = FLOOR_Y;
     this.physics.add.collider(this._player, this._floor);
 
     setCameraBounds(this, LEVEL_WIDTH, GAME_HEIGHT);
-    this.cameras.main.startFollow(this._player, true, 0.1, 0.05);
-    this.cameras.main.setDeadzone(80, 120);
+    followPlayerAhead(this, this._player);
+    this.cameras.main.fadeIn(500, 0, 0, 0);   // smooth blend in from Stage 1
 
-    // Caves: emerge from the snowy mountain cave; the glacier cave beyond leads
-    // onward to Stage 3.
-    const CAVE_Y = FLOOR_Y + 60;
-    addStartCave(this, 'cave-stage2-in', 90, CAVE_Y, 1.0);
-    this._endCave = addEndCave(this, 'cave-stage3', 4900, CAVE_Y, {
-      scale: 1.0, flip: true,
+    // Caves: the hero walks OUT of the mountain cave to open the stage, and the
+    // exit cave on the platform at the far end leads onward to Stage 3. Seated so
+    // the visible rock beds into the platform (~32px clear PNG padding otherwise
+    // reads as "hanging in the air").
+    const CAVE_Y = FLOOR_Y + 135;
+    const startCave = addStartCave(this, 'cave-stage2-out', 110, CAVE_Y, { scale: 1.0 });
+    this._endCave = addEndCave(this, 'cave-stage2-in', 4900, CAVE_Y, {
+      scale: 1.0,
       onEnter: () => this._enterEndCave(),
     });
+
+    // Chapter intro on the first visit: title card, hero walks out of the cave,
+    // then the arrival dialogue. On a death-restart he just walks out.
+    if (!this.registry.get('introSeen:Stage2')) {
+      this.registry.set('introSeen:Stage2', true);
+      this._player.enterCutscene();
+      storyTitle(this, 'CHAPTER II', 'The Himalayas').then(() => {
+        emergeFromCave(this, this._player, startCave, {
+          onDone: () => runDialogue(this, INTRO_LINES)
+            .then(() => { if (this._player.active) this._player.exitCutscene(); }),
+        });
+      });
+    } else {
+      emergeFromCave(this, this._player, startCave);
+    }
 
     this._triggers = STAGE2_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
@@ -112,11 +132,12 @@ export default class Stage2Scene extends Phaser.Scene {
     this._player.update(delta, targets);
 
     this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
-    this._checkTriggers();
+    // Don't trigger new waves during a story beat (intro emergence / boss beat).
+    if (!this._player.inputLocked) this._checkTriggers();
     this._cullDeadEnemies();
 
     // Spawn the final boss once the player reaches the end of the bridge.
-    if (!this._bossSpawned && this._player.x >= BOSS_TRIGGER_X) {
+    if (!this._player.inputLocked && !this._bossSpawned && this._player.x >= BOSS_TRIGGER_X) {
       this._spawnBoss();
     }
 
@@ -141,7 +162,9 @@ export default class Stage2Scene extends Phaser.Scene {
     this._waveActive = true;
     const waveDef    = STAGE2_WAVES[index];
 
-    const barrierX = waveDef.triggerX + 200;
+    // Seal the arena PAST the rightmost enemy so the player can flank them.
+    const rightmost = Math.max(...waveDef.enemies.map((e) => e.x));
+    const barrierX = rightmost + 320;
     this._waveBarrier = this.add.zone(barrierX, GAME_HEIGHT / 2, 20, GAME_HEIGHT);
     this.physics.add.existing(this._waveBarrier, true);
     this.physics.add.collider(this._player, this._waveBarrier);
@@ -161,7 +184,8 @@ export default class Stage2Scene extends Phaser.Scene {
       default: console.warn(`Unknown enemy type: ${type}`); return null;
     }
     this.physics.add.collider(enemy, this._floor);
-    this.physics.add.collider(this._player, enemy);
+    // No player↔enemy collider: the player can pass THROUGH/behind enemies to
+    // flank them (the wave barrier still seals the arena).
     return enemy;
   }
 
@@ -175,14 +199,6 @@ export default class Stage2Scene extends Phaser.Scene {
     this._waveActive = false;
     this._waveIndex++;
     this.events.emit('waveCleared', this._waveIndex);
-
-    // Checkpoint: a death now respawns here, not at the stage start — and the
-    // Narapichas from cleared waves never spawn again.
-    this.registry.set('checkpoint:Stage2Scene', {
-      waveIndex: this._waveIndex,
-      x: Phaser.Math.Clamp(this._player.x, 150, LEVEL_WIDTH - 300),
-    });
-    this.events.emit('checkpoint');
   }
 
   _spawnBoss() {
@@ -190,8 +206,6 @@ export default class Stage2Scene extends Phaser.Scene {
     this._boss = new CorruptedMonk(this, BOSS_SPAWN_X, FLOOR_Y - 55);
     this.physics.add.collider(this._boss, this._floor);
     this.events.emit('waveStarted', TOTAL_WAVE_COUNT, TOTAL_WAVE_COUNT);   // shows the BOSS banner in the HUD
-    this.registry.set('checkpoint:Stage2Scene', { waveIndex: this._waveIndex, x: BOSS_TRIGGER_X - 200 });
-    this.events.emit('checkpoint');
   }
 
   // Called by CorruptedMonk when its cast reaches the release frame.
@@ -208,17 +222,32 @@ export default class Stage2Scene extends Phaser.Scene {
   }
 
   _onBossDefeated() {
-    // Monk defeated — the glacier cave onward now beckons; walk into it.
+    // Story: the fallen monk drops the Heart of Sagarmatha — the relic that can
+    // cleanse the corruption. The hero takes it and presses on to the frozen peak.
     this.time.delayedCall(1300, () => {
       if (!this._player.active) return;
-      this._endCave.arm();
-      say(this, this._player, 'The corruption recedes. The glacier awaits beyond...', 3600);
+      this._player.enterCutscene();
+      runDialogue(this, [
+        { speaker: 'CORRUPTED MONK', text: 'Forgive me... the Heart of Sagarmatha... it was meant to protect us all...' },
+      ])
+        .then(() => itemReward(this, {
+          name: 'Heart of Sagarmatha',
+          desc: 'A sacred relic. Its light may cleanse the corruption at its source.',
+          color: 0x6fe0ff,
+        }))
+        .then(() => runDialogue(this, [
+          { speaker: 'THE GUARDIAN', text: 'So this is the key. The frozen peak — and its master — lie beyond.' },
+        ]))
+        .then(() => {
+          if (!this._player.active) return;
+          this._player.exitCutscene();
+          this._endCave.arm();
+          say(this, this._player, 'The glacier awaits. Let this end.', 3600);
+        });
     });
   }
 
   _enterEndCave() {
-    this.registry.remove('checkpoint:Stage2Scene');
-    this._player.inputLocked = true;
     this.cameras.main.fadeOut(600, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.stop('UIScene');

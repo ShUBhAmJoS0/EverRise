@@ -4,11 +4,11 @@ import Enemy from '../Enemy.js';
 // A Corrupted Monk's foot soldier — a spear/axe-wielding warrior that sprints
 // at the player and swings its polearm at close range.
 
-const NARAPICHAS_HP              = 70;
-const NARAPICHAS_SPEED           = 130;
-const NARAPICHAS_ATTACK_DMG      = 14;
-const NARAPICHAS_ATTACK_RANGE    = 150;   // reach of the polearm swing
-const NARAPICHAS_ATTACK_COOLDOWN = 1400;  // ms between swings
+const NARAPICHAS_HP              = 140;
+const NARAPICHAS_SPEED           = 185;
+const NARAPICHAS_ATTACK_DMG      = 22;
+const NARAPICHAS_ATTACK_RANGE    = 155;   // reach of the polearm swing
+const NARAPICHAS_ATTACK_COOLDOWN = 950;   // ms between swings
 
 export default class Narapichas extends Enemy {
   constructor(scene, x, y) {

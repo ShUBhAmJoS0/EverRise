@@ -1,13 +1,22 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
 
-// She seals the path with a magic shield, so she's built to feel like a real
-// boss: she RUNS at the player, hits harder on the clock, and takes a beating.
-const WITCH_HP           = 280;
-const WITCH_SPEED        = 175;  // comes running fast
-const WITCH_ATTACK_RANGE = 330;  // closes in before casting
-const WITCH_ATTACK_COOLDOWN = 2200; // ms between casts
-const WITCH_RELEASE_FRAME = 18;  // 1-based frame index where the orb leaves the hand
+// She starts BEHIND her magic shield lobbing a few orbs over it, then comes OUT
+// to engage — and stays out, chasing the player and casting. She does NOT retreat
+// back behind the shield. Every wound is answered with a short fast barrage.
+const WITCH_HP            = 340;
+const WITCH_MOVE_SPEED    = 210;  // chase speed once engaged
+const WITCH_ENGAGE_RANGE  = 300;  // casts from here; chases if the player is farther
+const WITCH_CAST_CD       = 1100; // ms between casts while engaged
+const WITCH_LURK_MS       = 1400; // brief opening dwell behind the shield
+const WITCH_LURK_CAST_MS  = 900;  // cadence of pot-shots during the opening lurk
+const WITCH_RELEASE_FRAME = 18;   // 1-based frame where the orb leaves the hand
+
+// Retaliation: a wound triggers a short fast burst of orbs, rate-limited.
+const WITCH_RETALIATE_CD  = 1400;  // min gap between retaliation bursts
+const WITCH_BURST_COUNT   = 2;     // orbs per retaliation
+const WITCH_BURST_SPEED   = 560;   // fast orbs
+const WITCH_NORMAL_SPEED  = 340;
 
 export default class ForestWitch extends Enemy {
   constructor(scene, x, y) {
@@ -21,9 +30,14 @@ export default class ForestWitch extends Enemy {
     this.body.setSize(180, 143);
     this.body.setOffset(50, 30);
 
-    this._attackCooldown = 0;
-    this._attacking = false;
-    this._dying = false;
+    this._homeX       = x;        // her opening spot BEHIND the shield
+    this._state       = 'lurk';   // 'lurk' → 'engage' (never returns to lurk)
+    this._stateTimer  = WITCH_LURK_MS;
+    this._lurkCastCd  = WITCH_LURK_CAST_MS;
+    this._castCd      = 0;
+    this._retaliateCd = 0;
+    this._attacking   = false;
+    this._dying       = false;
 
     this.isBoss   = true;
     this.bossName = 'The Forest Witch';
@@ -35,49 +49,72 @@ export default class ForestWitch extends Enemy {
   }
 
   updateBehavior(player, delta) {
+    // Keep a live player reference + tick the retaliation clock even mid-cast,
+    // so a wound can always be answered (see takeDamage below).
+    this._lastPlayer = player;
+    this._retaliateCd -= delta;
     if (!this.alive || this._dying || this._attacking) return;
 
-    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-    this._attackCooldown -= delta;
+    if (this._state === 'lurk') this._lurk(player, delta);
+    else                        this._engage(player, delta);
+  }
 
-    if (dist <= WITCH_ATTACK_RANGE && this._attackCooldown <= 0) {
-      this._startRangeAttack(player);
-    } else if (dist > WITCH_ATTACK_RANGE) {
-      // Approach until the player is within casting range.
-      const dir = player.x < this.x ? -1 : 1;
-      this.setFlipX(dir < 0);
-      this.body.setVelocityX(dir * WITCH_SPEED);
+  // Opening beat: hold behind the shield, facing the player, lobbing a couple of
+  // orbs over it — then commit to the fight and come out (permanently).
+  _lurk(player, delta) {
+    this.setFlipX(player.x < this.x);
+    const dx = this._homeX - this.x;
+    this.body.setVelocityX(Math.abs(dx) > 6 ? Phaser.Math.Clamp(dx, -120, 120) : 0);
+    if (this.anims.currentAnim?.key !== 'witch-idle') this.play('witch-idle', true);
 
-      if (this.anims.currentAnim?.key !== 'witch-run') {
-        this.play('witch-run', true);
-      }
+    this._lurkCastCd -= delta;
+    if (this._lurkCastCd <= 0) {
+      this._lurkCastCd = WITCH_LURK_CAST_MS;
+      this._startCast(player, WITCH_NORMAL_SPEED);
+      return;
+    }
+
+    this._stateTimer -= delta;
+    if (this._stateTimer <= 0) this._state = 'engage';
+  }
+
+  // Out in the open, chasing the player and casting on a cadence. She holds this
+  // stance for the rest of the fight — she never runs back behind the shield.
+  _engage(player, delta) {
+    const dir  = player.x < this.x ? -1 : 1;
+    const dist = Math.abs(player.x - this.x);
+    this.setFlipX(dir < 0);
+    this._castCd -= delta;
+
+    if (dist > WITCH_ENGAGE_RANGE) {
+      // Close the gap.
+      this.body.setVelocityX(dir * WITCH_MOVE_SPEED);
+      if (this.anims.currentAnim?.key !== 'witch-run') this.play('witch-run', true);
     } else {
-      // In range but cooling down — hold position and play idle.
+      // In range — stand and cast on the clock.
       this.body.setVelocityX(0);
-      const dir = player.x < this.x ? -1 : 1;
-      this.setFlipX(dir < 0);
-      if (this.anims.currentAnim?.key !== 'witch-idle') {
+      if (this._castCd <= 0) {
+        this._castCd = WITCH_CAST_CD;
+        this._startCast(player, WITCH_NORMAL_SPEED);
+      } else if (this.anims.currentAnim?.key !== 'witch-idle') {
         this.play('witch-idle', true);
       }
     }
   }
 
-  _startRangeAttack(player) {
-    this._attacking      = true;
-    this._attackCooldown = WITCH_ATTACK_COOLDOWN;
-    this._fired          = false;
+  _startCast(player, speed = WITCH_NORMAL_SPEED, onDone = null) {
+    this._attacking = true;
+    this._fired     = false;
     this.body.setVelocityX(0);
 
     const dir = player.x < this.x ? -1 : 1;
     this.setFlipX(dir < 0);
-
     this.play('witch-rangeattack', true);
 
-    // Release the orb exactly when the cast reaches frame 18.
     const onUpdate = (anim, frame) => {
       if (!this._fired && frame.index >= WITCH_RELEASE_FRAME) {
         this._fired = true;
-        this._fireProjectile(dir);
+        this._fireProjectile(dir, speed);
       }
     };
     this.on('animationupdate', onUpdate);
@@ -85,15 +122,41 @@ export default class ForestWitch extends Enemy {
     this.once('animationcomplete-witch-rangeattack', () => {
       this.off('animationupdate', onUpdate);
       this._attacking = false;
-      if (this.alive) this.play('witch-run', true);
+      onDone?.();
     });
   }
 
-  _fireProjectile(dir) {
+  _fireProjectile(dir, speed = WITCH_NORMAL_SPEED) {
     // Spawn from the witch's casting hand: forward + slightly above center.
     const x = this.x + dir * 70;
     const y = this.y - 25;
-    this.scene.spawnWitchProjectile(x, y, dir);
+    this.scene.spawnWitchProjectile(x, y, dir, speed);
+  }
+
+  // A wound is answered with a short fast barrage. She holds her ground — no
+  // retreat — and shrugs off the knockback so she isn't juggled.
+  takeDamage(amount, knockbackX = 0) {
+    if (!this.alive) return;
+    super.takeDamage(amount, 0);
+    if (!this.alive) return;
+    if (this._retaliateCd <= 0) {
+      this._retaliateCd = WITCH_RETALIATE_CD;
+      this._retaliate();
+    }
+  }
+
+  // A quick 2-orb burst loosed toward the player. Fires directly (no anim replay)
+  // so it can't re-trigger a concurrent normal cast's release — exactly 2 orbs.
+  _retaliate() {
+    const player = this._lastPlayer;
+    const dir = player && player.x < this.x ? -1 : 1;
+    this.setFlipX(dir < 0);
+
+    for (let i = 0; i < WITCH_BURST_COUNT; i++) {
+      this.scene.time.delayedCall(i * 110, () => {
+        if (this.alive) this._fireProjectile(dir, WITCH_BURST_SPEED);
+      });
+    }
   }
 
   onDeath() {

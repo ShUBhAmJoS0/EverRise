@@ -4,8 +4,8 @@ import Audio from '../../systems/AudioManager.js';
 import { shake } from '../../systems/fx.js';
 
 const YETI_SCALE = 1.3;
-const YETI_HP    = 400;
-const YETI_SPEED = 70;          // slow, heavy lumbering approach
+const YETI_HP    = 520;
+const YETI_SPEED = 115;         // heavy, but closes the gap with purpose
 const YETI_STOP_RANGE = 220;    // holds this distance once close enough to cast
 
 // Close-range staff swing. Player+enemy bodies collide (see
@@ -13,14 +13,14 @@ const YETI_STOP_RANGE = 220;    // holds this distance once close enough to cast
 // apart (~125px at this scale) — the range must clear that gap or the swing
 // can never trigger.
 const YETI_MELEE_RANGE     = 170;
-const YETI_MELEE_DMG       = 20;
-const YETI_MELEE_COOLDOWN  = 1800;
+const YETI_MELEE_DMG       = 28;
+const YETI_MELEE_COOLDOWN  = 1300;
 const YETI_MELEE_HIT_FRAME = 6;   // local index in the trimmed attack clip
 
 // The ground-slam blizzard — a screen-wide AOE cast on a fixed clock. Deals
 // only a little damage; the drama is the storm covering the whole screen.
-const YETI_BLIZZARD_COOLDOWN      = 4500;
-const YETI_BLIZZARD_DMG           = 10;
+const YETI_BLIZZARD_COOLDOWN      = 3200;
+const YETI_BLIZZARD_DMG           = 16;
 const YETI_BLIZZARD_TRIGGER_FRAME = 5;   // where the frost burst first appears
 
 // The yeti sheets are NOT drawn with a consistent default facing (they're

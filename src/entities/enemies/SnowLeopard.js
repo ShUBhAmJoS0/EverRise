@@ -6,15 +6,15 @@ import { shake, impactSparks, dustBurst } from '../../systems/fx.js';
 // A corrupted snow leopard — fast, low-slung predator that stalks the player
 // across the glacier and lunges in with a snarling bite at close range.
 
-const LEOPARD_HP              = 90;
-const LEOPARD_SPEED           = 170;
-const LEOPARD_ATTACK_DMG      = 15;
+const LEOPARD_HP              = 150;
+const LEOPARD_SPEED           = 230;
+const LEOPARD_ATTACK_DMG      = 24;
 // Player+enemy bodies collide (see Stage3Scene._spawnEnemy), which keeps their
 // centers at least ~half-widths apart (~135px) — the range must clear that
 // gap or the bite can never trigger.
 const LEOPARD_ATTACK_RANGE    = 170;
-const LEOPARD_ATTACK_COOLDOWN = 1100;
-const LEOPARD_LUNGE_SPEED     = 260;   // snap forward off the crouch, not rooted in place
+const LEOPARD_ATTACK_COOLDOWN = 800;
+const LEOPARD_LUNGE_SPEED     = 340;   // snap forward off the crouch, not rooted in place
 const LEOPARD_LUNGE_MS        = 120;
 
 export default class SnowLeopard extends Enemy {

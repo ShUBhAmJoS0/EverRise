@@ -7,12 +7,12 @@ import { shake, groundBurst } from '../../systems/fx.js';
 // along the grass at the player, rears up and lunges to bite, then recoils.
 // It's a ground creature: no gravity — it stays on the grass line.
 
-const SNAKE_HP          = 40;
-const SNAKE_SPEED       = 118;
-const SNAKE_LUNGE_RANGE = 150;
-const SNAKE_BITE_DMG    = 12;
-const SNAKE_BITE_REACH  = 155;
-const SNAKE_COOLDOWN    = 1500;
+const SNAKE_HP          = 70;
+const SNAKE_SPEED       = 168;
+const SNAKE_LUNGE_RANGE = 160;
+const SNAKE_BITE_DMG    = 18;
+const SNAKE_BITE_REACH  = 160;
+const SNAKE_COOLDOWN    = 1050;
 
 export default class Snake extends Enemy {
   constructor(scene, x, y) {
