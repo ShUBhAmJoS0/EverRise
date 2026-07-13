@@ -52,7 +52,8 @@ export default class Wolf extends Enemy {
           // Step 2: bite — only lands if the player is still in reach
           this.play('wolf-bite', true);
           const d = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-          if (d <= WOLF_ATTACK_RANGE + 40) player.takeDamage(WOLF_ATTACK_DMG);
+          // The wolf's savage bite strikes THROUGH a raised guard (unblockable).
+          if (d <= WOLF_ATTACK_RANGE + 40) player.takeDamage(WOLF_ATTACK_DMG, true);
           this.once('animationcomplete-wolf-bite', () => {
             this._attacking = false;
             if (this.alive) this.play('wolf-run', true);

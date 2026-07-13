@@ -9,6 +9,8 @@ import { setupPause } from '../systems/pause.js';
 import SaveManager from '../systems/SaveManager.js';
 import { addStartCave, addEndCave, emergeFromCave } from '../systems/caves.js';
 import { say, runDialogue, storyTitle, itemReward } from '../systems/dialogue.js';
+import Yarsagumba from '../entities/pickups/Yarsagumba.js';
+import { createPocket } from '../systems/pocket.js';
 
 // ── Story (Ch. II) — the hero reaches the Himalayas; the corruption is worse and
 // even the mountain beasts have turned. The Corrupted Monk holds the Heart of
@@ -105,6 +107,11 @@ export default class Stage2Scene extends Phaser.Scene {
       emergeFromCave(this, this._player, startCave);
     }
 
+    // Pocket HUD + the stage's Yarsagumba: one drops after the first foe falls,
+    // a second after the trio. Eat now (E) or store (R) and eat later via Tab.
+    this._pocket = createPocket(this);
+    this._yarsas = [];
+
     this._triggers = STAGE2_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
     );
@@ -140,12 +147,16 @@ export default class Stage2Scene extends Phaser.Scene {
     // Stage3Scene, where Narapichas/CorruptedMonk's counterparts hovered
     // above the deck until this was wired up).
     this._enemies.forEach((e) => { if (e.active) { e.updateBehavior(this._player, delta); e._clampToFloor(); } });
-    // Don't trigger new waves during a story beat (intro emergence / boss beat).
-    if (!this._player.inputLocked) this._checkTriggers();
+    this._pocket.update(this._player);
+    // Don't trigger waves / pick up herbs during a story beat or with the pocket open.
+    if (!this._player.inputLocked && !this._pocket.open) {
+      this._yarsas.forEach((y) => y.update(this._player));
+      this._checkTriggers();
+    }
     this._cullDeadEnemies();
 
     // Spawn the final boss once the player reaches the end of the bridge.
-    if (!this._player.inputLocked && !this._bossSpawned && this._player.x >= BOSS_TRIGGER_X) {
+    if (!this._player.inputLocked && !this._pocket.open && !this._bossSpawned && this._player.x >= BOSS_TRIGGER_X) {
       this._spawnBoss();
     }
 
@@ -205,10 +216,21 @@ export default class Stage2Scene extends Phaser.Scene {
     if (!allDead) return;
 
     if (this._waveBarrier) { this._waveBarrier.destroy(); this._waveBarrier = null; }
+    const cleared = STAGE2_WAVES[this._waveIndex];
     this._enemies = [];
     this._waveActive = false;
     this._waveIndex++;
     this.events.emit('waveCleared', this._waveIndex);
+
+    // A single Yarsagumba drops only after the trio (wave 2) is cleared.
+    if (cleared?.id === 'wave2') this._maybeSpawnYarsa('yarsa:Stage2:2', 3300);
+  }
+
+  // Spawn a Yarsagumba once (registry flag marks it taken so it doesn't respawn
+  // on a death-restart once eaten/stored).
+  _maybeSpawnYarsa(key, x) {
+    if (this.registry.get(key)) return;
+    this._yarsas.push(new Yarsagumba(this, x, FLOOR_Y + 33, key));
   }
 
   _spawnBoss() {
@@ -225,7 +247,7 @@ export default class Stage2Scene extends Phaser.Scene {
       texture:    'purple-projectile',
       travelAnim: 'purple-travel',
       impactAnim: 'purple-impact',
-      damage:     25,
+      damage:     20,   // attack power swapped with the Forest Witch (was 25)
       speed:      300,
     });
     this.physics.add.overlap(this._player, orb, () => orb.hit(this._player));

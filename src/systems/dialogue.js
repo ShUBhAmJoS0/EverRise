@@ -78,6 +78,9 @@ export function runDialogue(scene, lines, { speaker = 'THE GUARDIAN' } = {}) {
     scene.tweens.add({ targets: hint, alpha: 0.35, yoyo: true, repeat: -1, duration: 600 });
 
     let lineIdx = 0, typing = false, typeTimer = null, finished = false;
+    // Ignore advance presses for a beat after the panel opens, so a mashed
+    // Enter/E carried over from combat can't instantly skip the first line.
+    const openedAt = scene.time.now;
 
     const startLine = () => {
       typing = true;
@@ -93,6 +96,7 @@ export function runDialogue(scene, lines, { speaker = 'THE GUARDIAN' } = {}) {
     };
 
     const advance = () => {
+      if (scene.time.now - openedAt < 350) return;   // opening grace against mashed input
       Audio.play('menuMove');
       if (typing) { typeTimer?.remove(); txt.setText(seq[lineIdx].text); typing = false; }
       else if (++lineIdx >= seq.length) finish();

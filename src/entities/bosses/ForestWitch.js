@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
+import { impactSparks } from '../../systems/fx.js';
 
 // She starts BEHIND her magic shield lobbing a few orbs over it, then comes OUT
 // to engage — and stays out, chasing the player and casting. She does NOT retreat
@@ -12,11 +13,14 @@ const WITCH_LURK_MS       = 1400; // brief opening dwell behind the shield
 const WITCH_LURK_CAST_MS  = 900;  // cadence of pot-shots during the opening lurk
 const WITCH_RELEASE_FRAME = 18;   // 1-based frame where the orb leaves the hand
 
-// Retaliation: a wound triggers a short fast burst of orbs, rate-limited.
-const WITCH_RETALIATE_CD  = 1400;  // min gap between retaliation bursts
-const WITCH_BURST_COUNT   = 2;     // orbs per retaliation
-const WITCH_BURST_SPEED   = 560;   // fast orbs
-const WITCH_NORMAL_SPEED  = 340;
+// Retaliation: a wound triggers a short fast burst of orbs — but only after a
+// wind-up, so the player has time to raise a guard or dodge instead of being hit
+// the instant they swing.
+const WITCH_RETALIATE_DELAY = 1500;  // wind-up before the barrage fires
+const WITCH_RETALIATE_CD    = 2200;  // min gap between retaliation bursts
+const WITCH_BURST_COUNT     = 2;     // orbs per retaliation
+const WITCH_BURST_SPEED     = 560;   // fast orbs
+const WITCH_NORMAL_SPEED    = 340;
 
 export default class ForestWitch extends Enemy {
   constructor(scene, x, y) {
@@ -145,18 +149,21 @@ export default class ForestWitch extends Enemy {
     }
   }
 
-  // A quick 2-orb burst loosed toward the player. Fires directly (no anim replay)
-  // so it can't re-trigger a concurrent normal cast's release — exactly 2 orbs.
+  // A wound is answered with a 2-orb burst — but after a ~1.5s wind-up (a small
+  // spark tell), giving the player a window to block or dodge before it lands.
+  // Direction is read at fire time so the orbs track where the player actually is.
   _retaliate() {
-    const player = this._lastPlayer;
-    const dir = player && player.x < this.x ? -1 : 1;
-    this.setFlipX(dir < 0);
-
-    for (let i = 0; i < WITCH_BURST_COUNT; i++) {
-      this.scene.time.delayedCall(i * 110, () => {
-        if (this.alive) this._fireProjectile(dir, WITCH_BURST_SPEED);
-      });
-    }
+    impactSparks(this.scene, this.x, this.y - 25, 0xc98aff, 6);   // "charging" tell
+    this.scene.time.delayedCall(WITCH_RETALIATE_DELAY, () => {
+      if (!this.alive) return;
+      const dir = this._lastPlayer && this._lastPlayer.x < this.x ? -1 : 1;
+      this.setFlipX(dir < 0);
+      for (let i = 0; i < WITCH_BURST_COUNT; i++) {
+        this.scene.time.delayedCall(i * 110, () => {
+          if (this.alive) this._fireProjectile(dir, WITCH_BURST_SPEED);
+        });
+      }
+    });
   }
 
   onDeath() {

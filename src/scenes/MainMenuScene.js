@@ -36,7 +36,9 @@ export default class MainMenuScene extends Phaser.Scene {
     // Fresh run: drop pickups and every story flag from a previous attempt so the
     // whole story (chapter cards, intros, the pendant beat) plays again.
     [
-      'yarsa:Stage1', 'pendantGiven:Stage1',
+      'yarsa:Stage1', 'yarsa:Stage2:1', 'yarsa:Stage2:2',
+      'yarsa:Stage3:0', 'yarsa:Stage3:1', 'yarsa:Stage3:2',
+      'pendantGiven:Stage1', 'hpBonus', 'yarsaPocket',
       'introSeen:Stage1', 'introSeen:Stage2', 'introSeen:Stage3',
     ].forEach((k) => this.registry.remove(k));
     SaveManager.recordStageReached(1);

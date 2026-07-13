@@ -4,27 +4,16 @@ import Audio from '../../systems/AudioManager.js';
 import { shake } from '../../systems/fx.js';
 
 const YETI_SCALE = 1.3;
-const YETI_HP    = 520;
-const YETI_SPEED = 115;         // heavy, but closes the gap with purpose
-const YETI_STOP_RANGE = 220;    // holds this distance once close enough to cast
+const YETI_HP    = 600;          // EverRise's strongest foe — a long, punishing fight
+const YETI_SPEED = 145;          // relentless: closes on the player between casts
+const YETI_FOLLOW_RANGE = 90;    // hounds the player this close (no melee — only the hazard)
 
-// Close-range staff swing. Player+enemy bodies collide (see
-// Stage3Scene._spawnBoss), which keeps their centers at least ~half-widths
-// apart (~125px at this scale) — the range must clear that gap or the swing
-// can never trigger.
-const YETI_MELEE_RANGE     = 170;
-const YETI_MELEE_DMG       = 28;
-const YETI_MELEE_COOLDOWN  = 1300;
-const YETI_MELEE_HIT_FRAME = 11;  // frame index in the full attack clip (see
-                                   // animations.js yeti.attack) where the mace
-                                   // is fully extended/glowing — must stay in
-                                   // sync if that array ever changes
-
-// The ground-slam blizzard — a screen-wide AOE cast on a fixed clock. Deals
-// only a little damage; the drama is the storm covering the whole screen.
-const YETI_BLIZZARD_COOLDOWN      = 3200;
-const YETI_BLIZZARD_DMG           = 16;
-const YETI_BLIZZARD_TRIGGER_FRAME = 5;   // where the frost burst first appears
+// The ground-slam blizzard is the Yeti King's ONLY attack — a screen-wide frozen
+// HAZARD, not a melee blow, so a raised guard can't parry it (dodge it instead).
+// Fires on a fixed 6s clock and always chunks 15% of the player's MAX HP.
+const YETI_BLIZZARD_COOLDOWN      = 6000;  // every 6 seconds
+const YETI_BLIZZARD_PCT           = 0.15;  // 15% of the player's max HP
+const YETI_BLIZZARD_TRIGGER_FRAME = 5;     // where the frost burst first appears
 
 // The yeti sheets are NOT drawn with a consistent default facing (they're
 // AI-generated, not hand-authored — this project has hit the same issue with
@@ -81,8 +70,7 @@ export default class YetiKing extends Enemy {
     // shove him around.
     this.body.pushable = false;
 
-    this._meleeCooldown    = 0;
-    this._blizzardCooldown = YETI_BLIZZARD_COOLDOWN * 0.5;   // shorter first wait
+    this._blizzardCooldown = YETI_BLIZZARD_COOLDOWN * 0.4;   // shorter first wait
     this._attacking = false;
     this._dying = false;
 
@@ -114,14 +102,12 @@ export default class YetiKing extends Enemy {
   updateBehavior(player, delta) {
     if (!this.alive || this._dying) return;
 
-    // Facing is set once when an attack starts (see _startMelee/_startBlizzard)
+    // Facing is set once when a cast starts (see _startBlizzard)
     // and held for its duration — re-facing every frame here would spin the
     // sprite mid-swing/mid-cast if the player crosses to the other side.
     if (this._attacking) return;
 
     this._faceTowardPlayer(player);
-
-    this._meleeCooldown    -= delta;
     this._blizzardCooldown -= delta;
 
     if (this._blizzardCooldown <= 0) {
@@ -130,19 +116,11 @@ export default class YetiKing extends Enemy {
       return;
     }
 
-    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+    // No melee — the Yeti King has only his blizzard. Between casts he hounds the
+    // player relentlessly, staying right on top of them.
+    const dist = Math.abs(player.x - this.x);
     let walking = false;
-
-    if (dist <= YETI_MELEE_RANGE) {
-      this.body.setVelocityX(0);
-      if (this._meleeCooldown <= 0) {
-        this._startMelee(player);
-        return;
-      }
-    } else if (dist > YETI_STOP_RANGE) {
-      // Lumber toward the player until within range, same pattern as
-      // CorruptedMonk's approach — otherwise he'd just stand wherever he
-      // spawned until his first attack.
+    if (dist > YETI_FOLLOW_RANGE) {
       const dir = player.x < this.x ? -1 : 1;
       this.body.setVelocityX(dir * YETI_SPEED);
       walking = true;
@@ -150,38 +128,8 @@ export default class YetiKing extends Enemy {
       this.body.setVelocityX(0);
     }
 
-    // Play the run cycle while actually moving, idle otherwise — previously
-    // this always forced 'yeti-idle' even while setVelocityX() was moving
-    // him, so he visually slid across the ice instead of walking.
     const anim = walking ? 'yeti-run' : 'yeti-idle';
     if (this.anims.currentAnim?.key !== anim) this.play(anim, true);
-  }
-
-  _startMelee(player) {
-    this._attacking     = true;
-    this._meleeCooldown = YETI_MELEE_COOLDOWN;
-
-    const dir = player.x < this.x ? -1 : 1;
-    this.play('yeti-attack', true);
-    this._faceTowardPlayer(player);   // re-face now the (possibly mirrored) attack clip is active
-
-    this.scene.time.delayedCall((1000 / 16) * YETI_MELEE_HIT_FRAME, () => {
-      if (!this.alive) return;
-      const dx = player.x - this.x;
-      const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-      const inFront = dir > 0 ? dx > -20 : dx < 20;
-      if (inFront && dist <= YETI_MELEE_RANGE) {
-        player.takeDamage(YETI_MELEE_DMG);
-        shake(this.scene, 110, 0.005);
-        Audio.play('hit');
-        if (!player.alive) this._faceRight();
-      }
-    });
-
-    this.once('animationcomplete-yeti-attack', () => {
-      this._attacking = false;
-      if (this.alive) this.play('yeti-idle', true);
-    });
   }
 
   _startBlizzard(player) {
@@ -216,7 +164,9 @@ export default class YetiKing extends Enemy {
     // listener that calls this isn't stopped on death (see onDeath), so
     // without this check a dead boss could still land the AOE hit.
     if (!this.alive) return;
-    player.takeDamage(YETI_BLIZZARD_DMG);
+    // A frozen hazard, not a blow — unblockable (dodge it), and always 15% of the
+    // player's max HP so it stays dangerous no matter how many herbs they've eaten.
+    player.takeDamage(Math.max(1, Math.ceil(player.maxHp * YETI_BLIZZARD_PCT)), true);
     if (!player.alive) this._faceRight();
     shake(this.scene, 350, 0.01);
     Audio.play('hurt');

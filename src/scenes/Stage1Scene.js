@@ -14,6 +14,7 @@ import { addEndCave } from '../systems/caves.js';
 import { impactSparks } from '../systems/fx.js';
 import Audio from '../systems/AudioManager.js';
 import Yarsagumba from '../entities/pickups/Yarsagumba.js';
+import { createPocket } from '../systems/pocket.js';
 
 const GAME_HEIGHT    = 720;
 const PLATFORM_IMG_W = 677;
@@ -90,14 +91,13 @@ export default class Stage1Scene extends Phaser.Scene {
     setupPause(this);
     SaveManager.recordStageReached(1);
 
-    // Yarsagumba (sacred herb): ALWAYS available. It waits in the grass from the
-    // start of the stage — unless it's already been eaten this run, in which case
-    // keep the max-HP bonus through a death instead of respawning it.
-    if (this.registry.get(YARSA_KEY)) {
-      this._player.increaseMaxHp(25, 0);
-    } else {
-      this._spawnYarsagumba();
-    }
+    // Pocket HUD (stored herbs) + the stage's Yarsagumba, which waits in the grass
+    // from the start. The eaten max-HP bonus is persisted on the Player via the
+    // registry ('hpBonus'), so no reapply here — the herb just doesn't respawn
+    // once taken (eaten or stored).
+    this._pocket = createPocket(this);
+    this._yarsas = [];
+    if (!this.registry.get(YARSA_KEY)) this._spawnYarsagumba();
 
     // Opening story beat — chapter card, then the wolf-attack intro. Plays once
     // per playthrough (flag cleared on the menu) so a death-restart doesn't replay.
@@ -122,10 +122,11 @@ export default class Stage1Scene extends Phaser.Scene {
     this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
     Enemy.separate(this._enemies);
     this._endCave?.update(this._player);
-    // Pause pickups + wave triggers during a story beat (input locked) so a
-    // dialogue's E-press can't eat the herb and no new wave spawns mid-cutscene.
-    if (!this._player.inputLocked) {
-      this._yarsa?.update(this._player);
+    this._pocket.update(this._player);
+    // Pause pickups + wave triggers during a story beat or while the pocket is
+    // open, so E can't double-fire and no new wave spawns mid-cutscene.
+    if (!this._player.inputLocked && !this._pocket.open) {
+      this._yarsas.forEach((y) => y.update(this._player));
       this._checkTriggers();
       this._checkTransientAdvance();
     }
@@ -135,7 +136,7 @@ export default class Stage1Scene extends Phaser.Scene {
   _spawnYarsagumba() {
     // Fixed, guaranteed spot in the grass past the serpent groves and before the
     // witch — the player always walks over it on the way to the boss.
-    this._yarsa = new Yarsagumba(this, YARSA_X, FLOOR_Y + 30, YARSA_KEY);
+    this._yarsas.push(new Yarsagumba(this, YARSA_X, FLOOR_Y + 30, YARSA_KEY));
   }
 
   // ── The witch's magic shield: a curved wall of energy bowed toward the player ─
@@ -320,7 +321,10 @@ export default class Stage1Scene extends Phaser.Scene {
 
   // Called by ForestWitch when its cast reaches the release frame.
   spawnWitchProjectile(x, y, dir, speed) {
-    const orb = new Projectile(this, x, y, dir, speed ? { speed } : {});
+    // Attack power swapped with the Corrupted Monk: the witch now hits for 25.
+    const opts = { damage: 25 };
+    if (speed) opts.speed = speed;
+    const orb = new Projectile(this, x, y, dir, opts);
     this.physics.add.overlap(this._player, orb, () => orb.hit(this._player));
     return orb;
   }
@@ -340,17 +344,21 @@ export default class Stage1Scene extends Phaser.Scene {
     if (cleared?.shield) this._destroyShield();
 
     // Story: the corrupted wolf is beaten — the elder sends the hero onward and
-    // gives him the lucky pendant. Plays once per playthrough.
+    // gives him the lucky pendant. Freeze the hero right away, then hold a beat
+    // before the dialogue so a mashed Enter from the fight can't skip through it.
     if (cleared?.id === 'wave2' && !this.registry.get('pendantGiven:Stage1')) {
       this.registry.set('pendantGiven:Stage1', true);
       this._player.enterCutscene();
-      runDialogue(this, PENDANT_LINES)
-        .then(() => itemReward(this, {
-          name: 'Lucky Pendant',
-          desc: 'A charm from the elder — it steels your heart against the corruption.',
-          color: 0xf4c542,
-        }))
-        .then(() => { if (this._player.active) this._player.exitCutscene(); });
+      this.time.delayedCall(800, () => {
+        if (!this._player.active) return;
+        runDialogue(this, PENDANT_LINES)
+          .then(() => itemReward(this, {
+            name: 'Lucky Pendant',
+            desc: 'A charm from the elder — it steels your heart against the corruption.',
+            color: 0xf4c542,
+          }))
+          .then(() => { if (this._player.active) this._player.exitCutscene(); });
+      });
     }
   }
 

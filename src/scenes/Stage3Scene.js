@@ -9,6 +9,8 @@ import SaveManager from '../systems/SaveManager.js';
 import { addStartCave, emergeFromCave } from '../systems/caves.js';
 import { runDialogue, storyTitle } from '../systems/dialogue.js';
 import Audio from '../systems/AudioManager.js';
+import Yarsagumba from '../entities/pickups/Yarsagumba.js';
+import { createPocket } from '../systems/pocket.js';
 
 // ── Story (Ch. III) — Sagarmatha. The corrupted lake at its heart is the source
 // of it all; the Yeti King guards the way. With the Heart of Sagarmatha, the hero
@@ -99,6 +101,11 @@ export default class Stage3Scene extends Phaser.Scene {
       emergeFromCave(this, this._player, startCave);
     }
 
+    // Pocket HUD + Yarsagumba: none at the spawn — a single herb drops only after
+    // the first wave is beaten.
+    this._pocket = createPocket(this);
+    this._yarsas = [];
+
     this._triggers = STAGE3_WAVES.map((wave) =>
       this.add.zone(wave.triggerX, GAME_HEIGHT / 2, 10, GAME_HEIGHT)
     );
@@ -132,13 +139,17 @@ export default class Stage3Scene extends Phaser.Scene {
     // every frame for every active enemy (it's how their AI/movement already
     // works) — belt and suspenders against the floating bug recurring.
     this._enemies.forEach((e) => { if (e.active) { e.updateBehavior(this._player, delta); e._clampToFloor(); } });
-    // Don't trigger new waves during a story beat (intro emergence / boss beat).
-    if (!this._player.inputLocked) this._checkTriggers();
+    this._pocket.update(this._player);
+    // Don't trigger waves / pick up herbs during a story beat or with the pocket open.
+    if (!this._player.inputLocked && !this._pocket.open) {
+      this._yarsas.forEach((y) => y.update(this._player));
+      this._checkTriggers();
+    }
     this._cullDeadEnemies();
 
     // Spawn the final boss once both Leopard waves are cleared and the player
     // reaches the far end of the glacier.
-    if (!this._player.inputLocked && !this._bossSpawned && this._waveIndex >= STAGE3_WAVES.length && this._player.x >= BOSS_TRIGGER_X) {
+    if (!this._player.inputLocked && !this._pocket.open && !this._bossSpawned && this._waveIndex >= STAGE3_WAVES.length && this._player.x >= BOSS_TRIGGER_X) {
       this._spawnBoss();
     }
 
@@ -196,10 +207,21 @@ export default class Stage3Scene extends Phaser.Scene {
     if (!allDead) return;
 
     if (this._waveBarrier) { this._waveBarrier.destroy(); this._waveBarrier = null; }
+    const cleared = STAGE3_WAVES[this._waveIndex];
     this._enemies = [];
     this._waveActive = false;
     this._waveIndex++;
     this.events.emit('waveCleared', this._waveIndex);
+
+    // A single Yarsagumba drops only after the first wave is cleared.
+    if (cleared?.id === 'wave1') this._maybeSpawnYarsa('yarsa:Stage3:1', 2050);
+  }
+
+  // Spawn a Yarsagumba once (registry flag marks it taken so it doesn't respawn
+  // on a death-restart once eaten/stored).
+  _maybeSpawnYarsa(key, x) {
+    if (this.registry.get(key)) return;
+    this._yarsas.push(new Yarsagumba(this, x, FLOOR_Y + 33, key));
   }
 
   _spawnBoss() {

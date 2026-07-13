@@ -79,6 +79,10 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.hp    = PLAYER_MAX_HP;
     this.alive = true;
 
+    // Permanent HP from herbs eaten this run persists across a death/restart.
+    const hpBonus = scene.registry.get('hpBonus') || 0;
+    if (hpBonus > 0) { this.maxHp += hpBonus; this.hp = this.maxHp; }
+
     this.setScale(PLAYER_SCALE);
     this.setDepth(10);
 
@@ -104,6 +108,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this._isAttacking    = false;
     this._isDodging      = false;
     this._isCharging     = false;
+    this._isBlocking     = false;
     this._chargeStart    = 0;
     this._chargeDir      = 1;
     this._chargeMaxed    = false;
@@ -191,6 +196,16 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (this._isCharging) this._updateCharge();
 
+    // Block (hold X / right-mouse): raise the guard, root in place, take reduced
+    // damage. Only on the ground and when not already committed to another action.
+    if (this.controls.blockHeld && onGround && !this._isAttacking && !this._isDodging && !this._isCharging) {
+      this._enterBlock();
+      this._updateStones(enemies);
+      this._clampToFloor();
+      return;
+    }
+    if (this._isBlocking) this._exitBlock();
+
     this._handleDodge(onGround);
     if (!this._isDodging) {
       this._handleMovement(onGround);
@@ -200,6 +215,20 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
     this._updateStones(enemies);
     this._clampToFloor();
+  }
+
+  // ── Block / guard (hold X or right-mouse) ────────────────────────────────────
+  _enterBlock() {
+    this.body.setVelocityX(0);
+    if (!this._isBlocking) {
+      this._isBlocking = true;
+      this.play('player-block', true);   // raises the guard, holds on the last frame
+    }
+  }
+
+  _exitBlock() {
+    this._isBlocking = false;
+    this._playAnim('player-idle');
   }
 
   // Hard guarantee: the player can never be below the grass line. The grounded
@@ -494,6 +523,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this._isAttacking = false;
     this._isCharging  = false;
     this._isDodging   = false;
+    this._isBlocking  = false;
     this._chargeMaxed = false;
     this.setScale(PLAYER_SCALE);
     this.clearTint();
@@ -516,8 +546,27 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   // ── Damage / death ───────────────────────────────────────────────────────────
-  takeDamage(amount) {
+  // unblockable: the attacker strikes THROUGH a raised guard (only the wolf does).
+  takeDamage(amount, unblockable = false) {
     if (!this.alive || this._damageCooldown > 0 || this._isDodging) return;
+
+    // A raised guard fully parries the blow — with a shield spark and brief
+    // i-frames, no HP lost. The corrupted wolf is the exception: it strikes
+    // straight through the block for full damage.
+    if (this._isBlocking && !unblockable) {
+      this._damageCooldown = DAMAGE_COOLDOWN * 0.4;
+      const facing = this.flipX ? -1 : 1;
+      impactSparks(this.scene, this.x + facing * 46, this.y - 34, 0xbfe4ff, 10);
+      Audio.play('shieldBreak');
+      shake(this.scene, 55, 0.003);
+      return;   // parried — no damage
+    }
+
+    // A guard broken by the wolf gets a sharper "pierced" cue over the normal hit.
+    if (this._isBlocking && unblockable) {
+      impactSparks(this.scene, this.x, this.y - 30, 0xff8844, 10);
+    }
+
     this._damageCooldown = DAMAGE_COOLDOWN;
     this.hp -= amount;
     this.setTint(0xff0000);

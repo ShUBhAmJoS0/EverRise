@@ -33,8 +33,22 @@ export default class InputManager {
       z:      Phaser.Input.Keyboard.KeyCodes.Z,
       q:      Phaser.Input.Keyboard.KeyCodes.Q,
       e:      Phaser.Input.Keyboard.KeyCodes.E,
+      x:      Phaser.Input.Keyboard.KeyCodes.X,      // block (also right-mouse)
+      r:      Phaser.Input.Keyboard.KeyCodes.R,      // store the Yarsagumba
+      tab:    Phaser.Input.Keyboard.KeyCodes.TAB,    // open the pocket
       esc:    Phaser.Input.Keyboard.KeyCodes.ESC,
     });
+
+    // Mouse: left = attack, right = block. Stop the right-click context menu and
+    // keep Tab from moving browser focus.
+    scene.input.mouse?.disableContextMenu();
+    kb.addCapture([Phaser.Input.Keyboard.KeyCodes.TAB]);
+    this._lmbWasDown = false;   // for left-click attack edge detection
+    this._mmbWasDown = false;   // for middle-click Guleli edge detection
+
+    // Stop the middle-mouse "autoscroll" cursor so it can be used as Guleli.
+    this._preventMiddle = (e) => { if (e.button === 1) e.preventDefault(); };
+    scene.game.canvas?.addEventListener('mousedown', this._preventMiddle);
 
     // Left/Right Shift and Left/Right Ctrl can't be told apart by Phaser KeyCodes
     // (both map to the generic modifier), so track them from the raw DOM event.code.
@@ -60,6 +74,8 @@ export default class InputManager {
     this.sprintHeld = false;
     this.jumpPressed = this.attackPressed = this.comboPressed = false;
     this.dodgePressed = this.pausePressed = this.guleliPressed = false;
+    this.interactPressed = this.storePressed = this.pocketPressed = false;
+    this.blockHeld = false;
     this.guleliDown = false;
 
     scene.events.once('shutdown', this.destroy, this);
@@ -89,19 +105,34 @@ export default class InputManager {
     // Held state for variable jump height (release early = shorter hop).
     this.jumpHeld = k.space.isDown || k.w.isDown || k.up.isDown;
 
+    // Mouse buttons (activePointer tracks held state; clicks need an edge).
+    const p   = this.scene.input.activePointer;
+    const lmb = p ? p.leftButtonDown()   : false;
+    const rmb = p ? p.rightButtonDown()  : false;
+    const mmb = p ? p.middleButtonDown() : false;   // middle button = Guleli
+
     // Edge actions (fire once per press).
     this.jumpPressed     = this._anyJustDown(k.space, k.w, k.up);
-    this.attackPressed   = this._anyJustDown(k.enter, k.z);
+    this.attackPressed   = this._anyJustDown(k.enter, k.z) || (lmb && !this._lmbWasDown);
     this.dodgePressed    = this._anyJustDown(k.q);
     this.interactPressed = this._anyJustDown(k.e);
+    this.storePressed    = this._anyJustDown(k.r);
+    this.pocketPressed   = this._anyJustDown(k.tab);
     this.pausePressed    = this._anyJustDown(k.esc);
 
-    // Right Shift combo / Right Ctrl Guleli (latched from the DOM listener).
+    // Held: block on X or right-mouse.
+    this.blockHeld    = k.x.isDown || rmb;
+    this._lmbWasDown  = lmb;
+
+    // Right Shift combo (latched from the DOM listener).
     this.comboPressed  = this._comboQueued;
     this._comboQueued  = false;
-    this.guleliPressed = this._guleliQueued;
+
+    // Guleli: hold Right Ctrl OR the middle mouse button to charge, release to fire.
+    this.guleliPressed = this._guleliQueued || (mmb && !this._mmbWasDown);
     this._guleliQueued = false;
-    this.guleliDown    = this._guleliHeld;
+    this.guleliDown    = this._guleliHeld || mmb;
+    this._mmbWasDown   = mmb;
   }
 
   destroy() {
@@ -110,5 +141,6 @@ export default class InputManager {
       kb.off('keydown', this._onKeyDown);
       kb.off('keyup',   this._onKeyUp);
     }
+    this.scene?.game?.canvas?.removeEventListener('mousedown', this._preventMiddle);
   }
 }

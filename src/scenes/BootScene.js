@@ -33,6 +33,8 @@ export default class BootScene extends Phaser.Scene {
     this.load.spritesheet('player-jump',   'assets/characters/main-character/jump.png',         FRAME);
     // Guleli (slingshot) ranged weapon + its stone projectile.
     this.load.spritesheet('player-guleli', 'assets/characters/main-character/gulle-gulle.png',   FRAME);
+    // Block/guard stance sheet is 1280×503 → 5×2 grid of 256×251 frames.
+    this.load.spritesheet('player-block',  'assets/characters/main-character/block.png', { frameWidth: 256, frameHeight: 251 });
     this.load.spritesheet('stone', 'assets/characters/main-character/stone_projectile_spritesheet.png',
       { frameWidth: 64, frameHeight: 64 });
 

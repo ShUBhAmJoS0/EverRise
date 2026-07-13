@@ -65,6 +65,14 @@ export const ANIM_CONFIG = {
       frameRate: 22,
       loop: false,
     },
+    // Block/guard stance: raises the khukuri into a guard and holds it. 10 frames
+    // (256×251) — row 1 mid-guard, row 2 high guard; played once, holds on the last.
+    block: {
+      sheet: 'player-block',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      frameRate: 22,
+      loop: false,
+    },
   },
 
   // ── Guleli stone projectile ──────────────────────────────────────────────────

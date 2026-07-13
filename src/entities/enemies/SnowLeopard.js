@@ -6,7 +6,7 @@ import { shake, impactSparks, dustBurst } from '../../systems/fx.js';
 // A corrupted snow leopard — fast, low-slung predator that stalks the player
 // across the glacier and lunges in with a snarling bite at close range.
 
-const LEOPARD_HP              = 1;
+const LEOPARD_HP              = 90;
 const LEOPARD_SPEED           = 230;
 const LEOPARD_ATTACK_DMG      = 24;
 // Player+enemy bodies collide (see Stage3Scene._spawnEnemy), which keeps their
