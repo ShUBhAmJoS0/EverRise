@@ -6,7 +6,7 @@ import { shake, impactSparks, dustBurst } from '../../systems/fx.js';
 // A corrupted snow leopard — fast, low-slung predator that stalks the player
 // across the glacier and lunges in with a snarling bite at close range.
 
-const LEOPARD_HP              = 150;
+const LEOPARD_HP              = 1;
 const LEOPARD_SPEED           = 230;
 const LEOPARD_ATTACK_DMG      = 24;
 // Player+enemy bodies collide (see Stage3Scene._spawnEnemy), which keeps their
@@ -26,8 +26,15 @@ export default class SnowLeopard extends Enemy {
     // 33px ABOVE the visible ice deck (see Stage3Scene's PLAYER_SINK) — every
     // character's body must be shortened by that same 33px so it lands on the
     // visible ice, not on the invisible physics line above it.
+    //
+    // The derived rest line still left the paws hovering slightly above the ice
+    // in play, so drop the sprite ~7% of its height (256*0.07 ≈ 18px) by lowering
+    // offset.y (48 → 30). Because _clampToFloor pins body.bottom to FLOOR_Y, the
+    // world hitbox is [FLOOR_Y - sourceHeight*scaleY, FLOOR_Y] regardless of
+    // offset.y — so this shifts ONLY the visual down; hitbox + death landing are
+    // unchanged.
     this.body.setSize(200, 98);
-    this.body.setOffset(20, 48);
+    this.body.setOffset(20, 30);
 
     this._attackCooldown = 0;
     this._attacking = false;

@@ -221,18 +221,22 @@ export const ANIM_CONFIG = {
   },
 
   // ── Yeti King (Stage 3 final boss) ──────────────────────────────────────────
-  // idle        → frames 0-1 of the range-attack sheet (calm staff-planted
-  //               stance before the charge).
+  // idle        → full 25-frame dedicated idle.png loop (calm staff-planted
+  //               stance with subtle sway/breathing between frames).
   // run         → full 25-frame lumbering-approach cycle.
   // rangeattack → full 25-frame ground-slam. The frost burst first appears at
   //               frame 5, which is where the blizzard triggers (see YetiKing.js).
-  // attack      → normal-attack sheet, trimmed to the raise-swing-plant motion;
-  //               the staff/mace connects around local index 6.
+  // attack      → full 25-frame normal-attack sheet: idle-ready(0-4) →
+  //               windup/cross-swing(5-9) → rising diagonal cleave(10-14,
+  //               mace fully extended/glowing at 11) → retract(15-19) →
+  //               plant/brace hold(20-24). The mace connects at frame 11;
+  //               see YETI_MELEE_HIT_FRAME in YetiKing.js, which must stay
+  //               in sync with this array's index of that frame.
   yeti: {
     idle: {
-      sheet: 'yeti-rangeattack',
-      frames: [0, 1],
-      frameRate: 3,
+      sheet: 'yeti-idle',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 6,
       loop: true,
     },
     run: {
@@ -249,8 +253,8 @@ export const ANIM_CONFIG = {
     },
     attack: {
       sheet: 'yeti-attack',
-      frames: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-      frameRate: 16,
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 24,
       loop: false,
     },
   },

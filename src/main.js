@@ -47,4 +47,8 @@ const config = {
 const game = new Phaser.Game(config);
 
 // Expose the instance for dev tooling / automated smoke tests (harmless in prod).
-if (import.meta.env?.DEV) window.__EVERRISE__ = game;
+// import.meta.env is a Vite-only feature — it's simply absent when the game is
+// served directly by a plain static server (e.g. VS Code Live Server), which
+// this project explicitly supports via index.html's import map. Fall back to
+// always exposing it in that case rather than silently skipping.
+if (import.meta.env?.DEV ?? true) window.__EVERRISE__ = game;

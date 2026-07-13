@@ -229,10 +229,15 @@ export default class Stage1Scene extends Phaser.Scene {
     const SURFACE_OFFSET = 96;
     const PLAYER_SINK    = 25;
     const platformTopY   = FLOOR_Y + PLAYER_SINK - SURFACE_OFFSET;
+    // The art's left and right edges don't match (it wasn't painted as a seamless
+    // tile), so butting plain copies together left a visible seam every tile.
+    // Mirroring every other tile makes each join a reflection of itself — the
+    // pixels on both sides of every seam are now identical — so the seam
+    // disappears regardless of how the source art lines up.
     const numTiles = Math.ceil(LEVEL_WIDTH / PLATFORM_IMG_W) + 1;
     for (let i = 0; i < numTiles; i++) {
       this.add.image(i * PLATFORM_IMG_W + PLATFORM_IMG_W / 2, platformTopY, 'stage1-platform')
-        .setOrigin(0.5, 0).setDepth(1);
+        .setOrigin(0.5, 0).setFlipX(i % 2 === 1).setDepth(1);
     }
 
     // Solid invisible floor: one continuous static body across the whole level.
@@ -305,6 +310,10 @@ export default class Stage1Scene extends Phaser.Scene {
       case 'witch': enemy = new ForestWitch(this, x, y); break;
       default: console.warn(`Unknown enemy type: ${type}`); return null;
     }
+    // Ground-lock to the floor line (same as Stage 2/3): the collider alone
+    // doesn't reliably seat enemies on the platform — they can hover a few px
+    // above it. Enemy._clampToFloor pins them exactly once floorY is set.
+    enemy.floorY = FLOOR_Y;
     this.physics.add.collider(enemy, this._floor);
     return enemy;
   }

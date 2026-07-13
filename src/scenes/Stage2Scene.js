@@ -28,16 +28,16 @@ const LEVEL_WIDTH  = 5120;
 // Walkable surface (world y) where character feet rest.
 const FLOOR_Y      = 520;
 
-// Background native 1774×887 → scaled to fill the 720px-tall view.
-const BG_SCALE     = GAME_HEIGHT / 887;           // 0.812
-const BG_TILE_W    = 1774 * BG_SCALE;             // ~1440
+// Background native 1728×503 → scaled to fill the 720px-tall view.
+const BG_SCALE     = GAME_HEIGHT / 503;           // 1.431
+const BG_TILE_W    = 1728 * BG_SCALE;             // ~2473
 
-// Platform native 949×1024, walkable bridge deck at row ~367.
+// Platform native 915×499, walkable bridge deck at row ~81.
 // The deck is opaque edge-to-edge, so tiles of exactly PLAT_TILE_W butt together
 // seamlessly with no gap.
 const PLAT_SCALE   = 0.65;
-const PLAT_TILE_W  = 949 * PLAT_SCALE;            // ~617
-const PLAT_SURFACE = 367 * PLAT_SCALE;            // ~239px from image top to deck
+const PLAT_TILE_W  = 915 * PLAT_SCALE;            // ~595
+const PLAT_SURFACE = 81 * PLAT_SCALE;             // ~53px from image top to deck
 
 // The player's body bottom (collider rest) rests at FLOOR_Y; his visible feet
 // (foot mass, not the sword tip) sit ~33px lower. Put the deck at that foot line.
@@ -131,7 +131,15 @@ export default class Stage2Scene extends Phaser.Scene {
     const targets = this._boss && this._boss.alive ? [...liveEnemies, this._boss] : liveEnemies;
     this._player.update(delta, targets);
 
-    this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
+    // _clampToFloor() is also wired into Enemy.preUpdate (runs for every
+    // active enemy automatically), but that path depends on Phaser's Update
+    // List timing/gating, which is hard to guarantee from outside the engine.
+    // Calling it again here piggybacks on this loop, which we know fires
+    // every frame for every active enemy (it's how their AI/movement already
+    // works) — belt and suspenders against the floating bug recurring (see
+    // Stage3Scene, where Narapichas/CorruptedMonk's counterparts hovered
+    // above the deck until this was wired up).
+    this._enemies.forEach((e) => { if (e.active) { e.updateBehavior(this._player, delta); e._clampToFloor(); } });
     // Don't trigger new waves during a story beat (intro emergence / boss beat).
     if (!this._player.inputLocked) this._checkTriggers();
     this._cullDeadEnemies();
@@ -143,6 +151,7 @@ export default class Stage2Scene extends Phaser.Scene {
 
     if (this._boss && this._boss.active) {
       this._boss.updateBehavior(this._player, delta);
+      this._boss._clampToFloor();
     }
 
     this._endCave?.update(this._player);
@@ -183,6 +192,7 @@ export default class Stage2Scene extends Phaser.Scene {
       case 'narapichas': enemy = new Narapichas(this, x, y); break;
       default: console.warn(`Unknown enemy type: ${type}`); return null;
     }
+    enemy.floorY = FLOOR_Y;
     this.physics.add.collider(enemy, this._floor);
     // No player↔enemy collider: the player can pass THROUGH/behind enemies to
     // flank them (the wave barrier still seals the arena).
@@ -204,6 +214,7 @@ export default class Stage2Scene extends Phaser.Scene {
   _spawnBoss() {
     this._bossSpawned = true;
     this._boss = new CorruptedMonk(this, BOSS_SPAWN_X, FLOOR_Y - 55);
+    this._boss.floorY = FLOOR_Y;
     this.physics.add.collider(this._boss, this._floor);
     this.events.emit('waveStarted', TOTAL_WAVE_COUNT, TOTAL_WAVE_COUNT);   // shows the BOSS banner in the HUD
   }
@@ -265,7 +276,7 @@ export default class Stage2Scene extends Phaser.Scene {
   }
 
   _buildPlatforms() {
-    // Tile the bridge so its deck (row 367) sits at the player's foot line (DECK_Y):
+    // Tile the bridge so its deck (row 81) sits at the player's foot line (DECK_Y):
     // image top = DECK_Y - PLAT_SURFACE. Tiles butt together with no gap.
     const numTiles = Math.ceil(LEVEL_WIDTH / PLAT_TILE_W) + 1;
     for (let i = 0; i < numTiles; i++) {

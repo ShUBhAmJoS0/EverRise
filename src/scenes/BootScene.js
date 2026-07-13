@@ -67,9 +67,10 @@ export default class BootScene extends Phaser.Scene {
     this.load.spritesheet('leopard-bite',  'assets/goons/corrupted-snow-leopard/bite.png', FRAME);
 
     // ── Yeti King (Stage 3 final boss) ───────────────────────────────────────
-    // range-attack.png supplies both the idle (its calm opening frames) and
-    // the ground-slam blizzard cast. normal-attack.png is the close-range
-    // swing. run.png is the lumbering-approach animation.
+    // idle.png is the dedicated calm-stance loop. range-attack.png is the
+    // ground-slam blizzard cast. normal-attack.png is the close-range swing.
+    // run.png is the lumbering-approach animation.
+    this.load.spritesheet('yeti-idle',        'assets/characters/yeti/idle.png',          FRAME);
     this.load.spritesheet('yeti-rangeattack', 'assets/characters/yeti/range-attack.png',  FRAME);
     this.load.spritesheet('yeti-attack',      'assets/characters/yeti/normal-attack.png', FRAME);
     this.load.spritesheet('yeti-run',         'assets/characters/yeti/run.png',           FRAME);

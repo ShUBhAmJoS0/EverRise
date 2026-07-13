@@ -15,7 +15,10 @@ const YETI_STOP_RANGE = 220;    // holds this distance once close enough to cast
 const YETI_MELEE_RANGE     = 170;
 const YETI_MELEE_DMG       = 28;
 const YETI_MELEE_COOLDOWN  = 1300;
-const YETI_MELEE_HIT_FRAME = 6;   // local index in the trimmed attack clip
+const YETI_MELEE_HIT_FRAME = 11;  // frame index in the full attack clip (see
+                                   // animations.js yeti.attack) where the mace
+                                   // is fully extended/glowing — must stay in
+                                   // sync if that array ever changes
 
 // The ground-slam blizzard — a screen-wide AOE cast on a fixed clock. Deals
 // only a little damage; the drama is the storm covering the whole screen.
@@ -25,15 +28,17 @@ const YETI_BLIZZARD_TRIGGER_FRAME = 5;   // where the frost burst first appears
 
 // The yeti sheets are NOT drawn with a consistent default facing (they're
 // AI-generated, not hand-authored — this project has hit the same issue with
-// other enemies' sheets too). idle and rangeattack (both from
-// range-attack.png) face LEFT by default — confirmed empirically in play.
+// other enemies' sheets too). idle.png and range-attack.png both face LEFT
+// by default — confirmed by inspecting the sheets directly (staff/weapon
+// held on the character's left, same calm-stance pose in both).
 // run.png was visually compared frame-by-frame against range-attack.png
 // (leading leg + torso lean) and does NOT match — it faces RIGHT by default,
 // confirmed by inspecting the sheet directly (leading leg/staff both point
 // right, opposite of range-attack.png's left-facing pose).
-// normal-attack.png was visually compared against it and appears mirrored
-// (facing RIGHT) — inferred, not yet play-confirmed; if the melee swing
-// still faces the wrong way in testing, flip this single entry.
+// normal-attack.png is drawn front-facing/3-quarter (not a clean left/right
+// profile like the other three sheets), so flipping it doesn't read as
+// strongly as a facing change — it's left out of this set; if the melee
+// swing looks mirrored in testing, add 'yeti-attack' here.
 const LEFT_FACING_ANIMS = new Set(['yeti-idle', 'yeti-rangeattack']);
 
 // The Yeti King lumbers toward the player when far away, then holds his
@@ -58,12 +63,16 @@ export default class YetiKing extends Enemy {
     // Feet contact the ground at ~row 218 of the 256px frame (the deeper
     // pixels in the slam frames are the ice-splash VFX, not feet). Stage3's
     // floor collider top (FLOOR_Y) sits 33 world-px ABOVE the visible ice
-    // deck, so the body bottom must be 33/scale ≈ 25 texture-px above the
-    // feet → texture row ~193 (offsetY + sizeH = 193). Gravity (inherited
-    // from Enemy) settles him onto the floor collider exactly like every
-    // other enemy in this stage — no hand-picked spawn Y needed.
+    // deck. Gravity (inherited from Enemy) settles him onto the floor collider
+    // exactly like every other enemy in this stage — no hand-picked spawn Y.
+    //
+    // Like SnowLeopard, the derived rest line still left him hovering above the
+    // ice, so drop the sprite ~7% of its height by lowering offset.y (55 → 37,
+    // an 18 texture-px = 23 world-px drop at scale 1.3). _clampToFloor pins
+    // body.bottom to FLOOR_Y, so the world hitbox is independent of offset.y —
+    // this shifts ONLY the visual down; hitbox + death landing are unchanged.
     this.body.setSize(140, 138);
-    this.body.setOffset(60, 55);
+    this.body.setOffset(60, 37);
     // `pushable`, unlike `immovable`, only affects the velocity/position
     // exchange in dynamic-vs-dynamic separation (player collider) — it
     // doesn't touch the dynamic-vs-static floor collider, so it doesn't

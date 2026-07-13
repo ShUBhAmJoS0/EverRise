@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
+import { dustBurst } from '../../systems/fx.js';
 
 // A Corrupted Monk's foot soldier — a spear/axe-wielding warrior that sprints
 // at the player and swings its polearm at close range.
@@ -75,15 +76,33 @@ export default class Narapichas extends Enemy {
 
   onDeath() {
     this._dying = true;
-    this.body.setVelocityX(0);
 
-    // No death sheet — fade out as a stand-in.
+    // No death sheet — a real collapse instead of hanging weightless mid-tip:
+    // Enemy.die() disables gravity, so turn it back on and let the knees
+    // buckle backward under it onto the floor collider. No rotation of the
+    // whole sprite — a full-body spin reads as flipping upside down rather
+    // than a fall (see SnowLeopard's death, which had the same problem).
+    this.body.setAllowGravity(true);
+    const knockDir = this.flipX ? 1 : -1;
+    this.body.setVelocity(knockDir * 90, -180);
+
+    // Crumple slightly as it drops — a stiff sprite just falling straight
+    // down doesn't read as a body giving out.
     this.scene.tweens.add({
-      targets: this,
-      alpha: 0,
-      angle: 80,
-      duration: 500,
-      onComplete: () => this.destroy(),
+      targets: this, scaleY: this.scaleY * 0.85, duration: 350, ease: 'Sine.easeIn',
+    });
+
+    this.scene.time.delayedCall(420, () => {
+      if (!this.scene) return;
+      this.body.setVelocity(0, 0);
+      dustBurst(this.scene, this.x, this.body.bottom);
+
+      this.scene.tweens.add({
+        targets: this,
+        alpha: 0,
+        duration: 350,
+        onComplete: () => this.destroy(),
+      });
     });
   }
 }

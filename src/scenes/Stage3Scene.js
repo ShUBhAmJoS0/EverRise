@@ -125,7 +125,13 @@ export default class Stage3Scene extends Phaser.Scene {
     const targets = this._boss && this._boss.alive ? [...liveEnemies, this._boss] : liveEnemies;
     this._player.update(delta, targets);
 
-    this._enemies.forEach((e) => { if (e.active) e.updateBehavior(this._player, delta); });
+    // _clampToFloor() is also wired into Enemy.preUpdate (runs for every
+    // active enemy automatically), but that path depends on Phaser's Update
+    // List timing/gating, which is hard to guarantee from outside the engine.
+    // Calling it again here piggybacks on this loop, which we know fires
+    // every frame for every active enemy (it's how their AI/movement already
+    // works) — belt and suspenders against the floating bug recurring.
+    this._enemies.forEach((e) => { if (e.active) { e.updateBehavior(this._player, delta); e._clampToFloor(); } });
     // Don't trigger new waves during a story beat (intro emergence / boss beat).
     if (!this._player.inputLocked) this._checkTriggers();
     this._cullDeadEnemies();
@@ -138,6 +144,7 @@ export default class Stage3Scene extends Phaser.Scene {
 
     if (this._boss && this._boss.active) {
       this._boss.updateBehavior(this._player, delta);
+      this._boss._clampToFloor();
     }
   }
 
@@ -176,6 +183,7 @@ export default class Stage3Scene extends Phaser.Scene {
       case 'leopard': enemy = new SnowLeopard(this, x, y); break;
       default: console.warn(`Unknown enemy type: ${type}`); return null;
     }
+    enemy.floorY = FLOOR_Y;
     this.physics.add.collider(enemy, this._floor);
     // No player↔enemy collider: the player can pass THROUGH/behind enemies to
     // flank them (the wave barrier still seals the arena).
@@ -200,6 +208,7 @@ export default class Stage3Scene extends Phaser.Scene {
     // collider — same pattern as every other enemy in this stage (Narapichas,
     // SnowLeopard, CorruptedMonk), rather than a hand-picked "final" Y.
     this._boss = new YetiKing(this, BOSS_SPAWN_X, FLOOR_Y - 150);
+    this._boss.floorY = FLOOR_Y;
     this.physics.add.collider(this._boss, this._floor);
     // No player↔boss collider: the player can slip behind the Yeti King to flank.
     this.events.emit('waveStarted', TOTAL_WAVE_COUNT, TOTAL_WAVE_COUNT);   // shows the BOSS banner
