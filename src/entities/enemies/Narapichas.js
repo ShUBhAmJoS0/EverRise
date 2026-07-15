@@ -5,7 +5,7 @@ import { dustBurst } from '../../systems/fx.js';
 // A Corrupted Monk's foot soldier — a spear/axe-wielding warrior that sprints
 // at the player and swings its polearm at close range.
 
-const NARAPICHAS_HP              = 140;
+const NARAPICHAS_HP              = 1;
 const NARAPICHAS_SPEED           = 185;
 const NARAPICHAS_ATTACK_DMG      = 22;
 const NARAPICHAS_ATTACK_RANGE    = 155;   // reach of the polearm swing

@@ -234,12 +234,16 @@ export const ANIM_CONFIG = {
   // run         → full 25-frame lumbering-approach cycle.
   // rangeattack → full 25-frame ground-slam. The frost burst first appears at
   //               frame 5, which is where the blizzard triggers (see YetiKing.js).
-  // attack      → full 25-frame normal-attack sheet: idle-ready(0-4) →
-  //               windup/cross-swing(5-9) → rising diagonal cleave(10-14,
-  //               mace fully extended/glowing at 11) → retract(15-19) →
-  //               plant/brace hold(20-24). The mace connects at frame 11;
-  //               see YETI_MELEE_HIT_FRAME in YetiKing.js, which must stay
-  //               in sync with this array's index of that frame.
+  // attack      → normal-attack.png, trimmed to the active swing (same reason
+  //               as the player's attack above): sheet frames 0-4 are a
+  //               ready-stance that barely differs from idle, and 23-24 repeat
+  //               the settled hold, so both ends are dropped. What's left:
+  //               windup(5-7) → flourish cleave away from the target(8-11) →
+  //               mace comes overhead(12-17) → finishing blow whips out, mace
+  //               fully extended with the head glowing(18-19) → follow-through
+  //               settle(20-22). The mace CONNECTS on sheet frame 19; see
+  //               YETI_MELEE_HIT_FRAME in YetiKing.js, which is that frame's
+  //               1-based position in this array and must stay in sync with it.
   yeti: {
     idle: {
       sheet: 'yeti-idle',
@@ -261,7 +265,7 @@ export const ANIM_CONFIG = {
     },
     attack: {
       sheet: 'yeti-attack',
-      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frames: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
       frameRate: 24,
       loop: false,
     },

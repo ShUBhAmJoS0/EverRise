@@ -1,19 +1,32 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
 import Audio from '../../systems/AudioManager.js';
-import { shake } from '../../systems/fx.js';
+import { shake, impactSparks } from '../../systems/fx.js';
 
 const YETI_SCALE = 1.3;
 const YETI_HP    = 600;          // EverRise's strongest foe — a long, punishing fight
 const YETI_SPEED = 145;          // relentless: closes on the player between casts
-const YETI_FOLLOW_RANGE = 90;    // hounds the player this close (no melee — only the hazard)
+const YETI_FOLLOW_RANGE = 90;    // hounds the player this close, mace ready
 
-// The ground-slam blizzard is the Yeti King's ONLY attack — a screen-wide frozen
-// HAZARD, not a melee blow, so a raised guard can't parry it (dodge it instead).
-// Fires on a fixed 6s clock and always chunks 15% of the player's MAX HP.
+// He has two attacks, and they answer to DIFFERENT defences — that split is the
+// whole rhythm of the fight: parry the mace, dodge the blizzard.
+//
+// The ground-slam blizzard is a screen-wide frozen HAZARD, not a blow, so a
+// raised guard can't parry it (dodge it instead). Fires on a fixed 6s clock and
+// always chunks 15% of the player's MAX HP.
 const YETI_BLIZZARD_COOLDOWN      = 6000;  // every 6 seconds
 const YETI_BLIZZARD_PCT           = 0.15;  // 15% of the player's max HP
 const YETI_BLIZZARD_TRIGGER_FRAME = 5;     // where the frost burst first appears
+
+// The mace swing is an ordinary melee blow — the heaviest in the game, but a
+// raised guard parries it outright (Player.takeDamage's default). Swung on its
+// own shorter clock at anyone who stays inside his reach between casts.
+const YETI_MELEE_DMG        = 26;
+const YETI_MELEE_RANGE      = 150;   // reach of the mace, measured center-to-center
+const YETI_MELEE_COOLDOWN   = 1600;
+// 1-based index into the trimmed yeti-attack frame list (see ANIM_CONFIG.yeti.attack):
+// the finishing blow, mace fully extended with the head glowing. Keep the two in sync.
+const YETI_MELEE_HIT_FRAME  = 15;
 
 // The yeti sheets are NOT drawn with a consistent default facing (they're
 // AI-generated, not hand-authored — this project has hit the same issue with
@@ -24,14 +37,15 @@ const YETI_BLIZZARD_TRIGGER_FRAME = 5;     // where the frost burst first appear
 // (leading leg + torso lean) and does NOT match — it faces RIGHT by default,
 // confirmed by inspecting the sheet directly (leading leg/staff both point
 // right, opposite of range-attack.png's left-facing pose).
-// normal-attack.png is drawn front-facing/3-quarter (not a clean left/right
-// profile like the other three sheets), so flipping it doesn't read as
-// strongly as a facing change — it's left out of this set; if the melee
-// swing looks mirrored in testing, add 'yeti-attack' here.
-const LEFT_FACING_ANIMS = new Set(['yeti-idle', 'yeti-rangeattack']);
+// normal-attack.png draws the torso front-on/3-quarter, so its STANCE has no
+// clean left/right profile to read like the other three sheets — but the SWING
+// does: the finishing blow (sheet frame 19) whips the mace out to the LEFT.
+// That's what has to point at the player, so the sheet belongs in this set —
+// otherwise the killing blow lands on the boss's empty side.
+const LEFT_FACING_ANIMS = new Set(['yeti-idle', 'yeti-rangeattack', 'yeti-attack']);
 
 // The Yeti King lumbers toward the player when far away, then holds his
-// ground: swings his staff in melee at close range, or slams it down for a
+// ground: swings his mace in melee at close range, or slams it down for a
 // screen-wide blizzard on a longer clock — same shape as CorruptedMonk
 // (Stage 2's boss) with an extra close-range option.
 export default class YetiKing extends Enemy {
@@ -71,6 +85,7 @@ export default class YetiKing extends Enemy {
     this.body.pushable = false;
 
     this._blizzardCooldown = YETI_BLIZZARD_COOLDOWN * 0.4;   // shorter first wait
+    this._meleeCooldown = 0;
     this._attacking = false;
     this._dying = false;
 
@@ -102,23 +117,33 @@ export default class YetiKing extends Enemy {
   updateBehavior(player, delta) {
     if (!this.alive || this._dying) return;
 
-    // Facing is set once when a cast starts (see _startBlizzard)
-    // and held for its duration — re-facing every frame here would spin the
-    // sprite mid-swing/mid-cast if the player crosses to the other side.
+    // Facing is set once when a swing or cast starts (see _startMelee /
+    // _startBlizzard) and held for its duration — re-facing every frame here
+    // would spin the sprite mid-swing/mid-cast if the player crosses sides.
     if (this._attacking) return;
 
     this._faceTowardPlayer(player);
     this._blizzardCooldown -= delta;
+    this._meleeCooldown    -= delta;
 
+    // The blizzard's fixed clock outranks the mace: when the cast comes due it
+    // interrupts the melee rhythm rather than queueing behind it.
     if (this._blizzardCooldown <= 0) {
       this.body.setVelocityX(0);
       this._startBlizzard(player);
       return;
     }
 
-    // No melee — the Yeti King has only his blizzard. Between casts he hounds the
-    // player relentlessly, staying right on top of them.
+    // Between casts he hounds the player relentlessly, staying right on top of
+    // them — and anyone who lingers inside his reach eats the mace.
     const dist = Math.abs(player.x - this.x);
+
+    if (dist <= YETI_MELEE_RANGE && this._meleeCooldown <= 0) {
+      this.body.setVelocityX(0);
+      this._startMelee(player);
+      return;
+    }
+
     let walking = false;
     if (dist > YETI_FOLLOW_RANGE) {
       const dir = player.x < this.x ? -1 : 1;
@@ -130,6 +155,60 @@ export default class YetiKing extends Enemy {
 
     const anim = walking ? 'yeti-run' : 'yeti-idle';
     if (this.anims.currentAnim?.key !== anim) this.play(anim, true);
+  }
+
+  _startMelee(player) {
+    this._attacking     = true;
+    this._meleeCooldown = YETI_MELEE_COOLDOWN;
+    this._swung         = false;
+    this.body.setVelocityX(0);
+
+    this.play('yeti-attack', true);
+    this._faceTowardPlayer(player);   // re-face now that facing is frozen for the swing's duration
+    Audio.play('swing');
+
+    // Which way the mace travels in world space, locked in at the swing's start.
+    // The player can still slip behind him during the long windup, and a blow
+    // that started on the other side must not connect (SnowLeopard's bite has
+    // the same rule) — so remember the side he committed to.
+    const dir = player.x < this.x ? -1 : 1;
+
+    const onUpdate = (anim, frame) => {
+      if (!this._swung && frame.index >= YETI_MELEE_HIT_FRAME) {
+        this._swung = true;
+        this._landMeleeHit(player, dir);
+      }
+    };
+    this.on('animationupdate', onUpdate);
+
+    this.once('animationcomplete-yeti-attack', () => {
+      this.off('animationupdate', onUpdate);
+      this._attacking = false;
+      if (this.alive) this.play('yeti-idle', true);
+    });
+  }
+
+  // The mace connects. Unlike the blizzard this is an ordinary blow, so it goes
+  // through Player.takeDamage's normal path: a raised guard parries it outright.
+  _landMeleeHit(player, dir) {
+    // Same guard as _unleashBlizzard: a killing blow can land mid-swing without
+    // stopping this listener (see onDeath), so a dead boss must not still hit.
+    if (!this.alive) return;
+
+    const dx = player.x - this.x;
+    const inFront = dir > 0 ? dx > -20 : dx < 20;
+    if (!inFront || Math.abs(dx) > YETI_MELEE_RANGE) return;   // they slipped the swing
+
+    // Only dress the hit if HP actually moved — takeDamage bails out on a parry,
+    // a dodge, or leftover i-frames, and each of those already plays its own cue.
+    const hpBefore = player.hp;
+    player.takeDamage(YETI_MELEE_DMG);
+    if (player.hp === hpBefore) return;
+
+    if (!player.alive) this._faceRight();
+    impactSparks(this.scene, player.x, player.y - 20, 0xbfe4ff, 12);
+    shake(this.scene, 160, 0.007);
+    Audio.play('hit');
   }
 
   _startBlizzard(player) {
