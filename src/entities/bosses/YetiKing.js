@@ -4,8 +4,8 @@ import Audio from '../../systems/AudioManager.js';
 import { shake, impactSparks } from '../../systems/fx.js';
 
 const YETI_SCALE = 1.3;
-const YETI_HP    = 600;          // EverRise's strongest foe — a long, punishing fight
-const YETI_SPEED = 145;          // relentless: closes on the player between casts
+const YETI_HP    = 760;          // EverRise's strongest foe — a long, punishing fight
+const YETI_SPEED = 205;          // relentless: sprints the player down between casts
 const YETI_FOLLOW_RANGE = 90;    // hounds the player this close, mace ready
 
 // He has two attacks, and they answer to DIFFERENT defences — that split is the
@@ -14,16 +14,16 @@ const YETI_FOLLOW_RANGE = 90;    // hounds the player this close, mace ready
 // The ground-slam blizzard is a screen-wide frozen HAZARD, not a blow, so a
 // raised guard can't parry it (dodge it instead). Fires on a fixed 6s clock and
 // always chunks 15% of the player's MAX HP.
-const YETI_BLIZZARD_COOLDOWN      = 6000;  // every 6 seconds
+const YETI_BLIZZARD_COOLDOWN      = 4800;  // faster storms as the finale demands
 const YETI_BLIZZARD_PCT           = 0.15;  // 15% of the player's max HP
 const YETI_BLIZZARD_TRIGGER_FRAME = 5;     // where the frost burst first appears
 
 // The mace swing is an ordinary melee blow — the heaviest in the game, but a
 // raised guard parries it outright (Player.takeDamage's default). Swung on its
 // own shorter clock at anyone who stays inside his reach between casts.
-const YETI_MELEE_DMG        = 26;
-const YETI_MELEE_RANGE      = 150;   // reach of the mace, measured center-to-center
-const YETI_MELEE_COOLDOWN   = 1600;
+const YETI_MELEE_DMG        = 32;
+const YETI_MELEE_RANGE      = 155;   // reach of the mace, measured center-to-center
+const YETI_MELEE_COOLDOWN   = 1050;  // hammers back-to-back (was 1600)
 // 1-based index into the trimmed yeti-attack frame list (see ANIM_CONFIG.yeti.attack):
 // the finishing blow, mace fully extended with the head glowing. Keep the two in sync.
 const YETI_MELEE_HIT_FRAME  = 15;

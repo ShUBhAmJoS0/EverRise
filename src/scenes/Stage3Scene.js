@@ -294,8 +294,10 @@ export default class Stage3Scene extends Phaser.Scene {
   _buildBackground() {
     const tilesNeeded = Math.ceil(LEVEL_WIDTH / BG_TILE_W) + 1;
     for (let i = 0; i < tilesNeeded; i++) {
+      // Mirror alternate copies so the repeat seam disappears (see Stage1Scene).
       this.add.image(i * BG_TILE_W + BG_TILE_W / 2, GAME_HEIGHT / 2, 'stage3-bg')
-        .setDisplaySize(BG_TILE_W, GAME_HEIGHT)
+        .setDisplaySize(BG_TILE_W + 2, GAME_HEIGHT)
+        .setFlipX(i % 2 === 1)
         .setDepth(0);
     }
   }

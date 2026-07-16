@@ -16,6 +16,9 @@ export function setCameraBounds(scene, bgWidth, bgHeight) {
 export function followPlayerAhead(scene, player) {
   const cam   = scene.cameras.main;
   const leadX = -Math.round(cam.width * 0.20);   // player rests at 30% from left
-  cam.startFollow(player, true, 0.12, 0.1, leadX, 0);
+  // roundPixels = false: with an eased follow, rounding the scroll to whole
+  // pixels makes the world jitter ±1px (crisp props like caves shake left/right).
+  // A sub-pixel scroll keeps the scrolling smooth.
+  cam.startFollow(player, false, 0.12, 0.1, leadX, 0);
   cam.setDeadzone(40, 150);
 }

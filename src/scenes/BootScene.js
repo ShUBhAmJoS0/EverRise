@@ -38,6 +38,14 @@ export default class BootScene extends Phaser.Scene {
     this.load.spritesheet('stone', 'assets/characters/main-character/stone_projectile_spritesheet.png',
       { frameWidth: 64, frameHeight: 64 });
 
+    // ── Budo Khate (the village elder who gifts the Guleli after Stage 1) ──────
+    // 1280×1280 → 5×5 grid of 256×256 frames. Inspected directly (rendered the
+    // sheet large on a light background — the dark forest scene is too murky to
+    // read facing from): he faces RIGHT by default, same as the main character.
+    // Feet rest on row ~222, head tops out at ~29, consistent across all 25
+    // frames, and the figure is horizontally centred.
+    this.load.spritesheet('budo-walk', 'assets/characters/budo_khate-walk.png', FRAME);
+
     // ── Corrupted Wolf ─────────────────────────────────────────────────────
     this.load.spritesheet('wolf-bite',   'assets/goons/corrupted-wolf/bite.png',   FRAME);
     this.load.spritesheet('wolf-pounce', 'assets/goons/corrupted-wolf/pounce.png', FRAME);

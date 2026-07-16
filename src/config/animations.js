@@ -39,7 +39,7 @@ export const ANIM_CONFIG = {
     // air until landing. (Was using the full sheet, which read like a flip.)
     jump: {
       sheet: 'player-jump',
-      frames: [0, 1, 2, 3, 4, 5, 6, 7],
+      frames: [ 3, 4, 5, 6, 7],
       frameRate: 22,
       loop: false,
     },
@@ -65,13 +65,25 @@ export const ANIM_CONFIG = {
       frameRate: 22,
       loop: false,
     },
-    // Block/guard stance: raises the khukuri into a guard and holds it. 10 frames
-    // (256×251) — row 1 mid-guard, row 2 high guard; played once, holds on the last.
+    // Block/guard stance: raises the khukuri into a guard and holds it. The sheet's
+    // last frame (9) is a stray/mistaken pose, so it's excluded — the guard holds
+    // on frame 8.
     block: {
       sheet: 'player-block',
-      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      frames: [0, 1, 2, 3, 4, 5, 6],
       frameRate: 22,
       loop: false,
+    },
+  },
+
+  // ── Budo Khate (village elder, Stage 1 Guleli gift cutscene) ────────────────
+  // Full 25-frame walk cycle. Slow frameRate — he's old and leans on a cane.
+  budo: {
+    walk: {
+      sheet: 'budo-walk',
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      frameRate: 12,
+      loop: true,
     },
   },
 
@@ -254,19 +266,19 @@ export const ANIM_CONFIG = {
     run: {
       sheet: 'yeti-run',
       frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
-      frameRate: 16,
+      frameRate: 20,
       loop: true,
     },
     rangeattack: {
       sheet: 'yeti-rangeattack',
       frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
-      frameRate: 14,
+      frameRate: 19,
       loop: false,
     },
     attack: {
       sheet: 'yeti-attack',
       frames: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
-      frameRate: 24,
+      frameRate: 30,
       loop: false,
     },
   },

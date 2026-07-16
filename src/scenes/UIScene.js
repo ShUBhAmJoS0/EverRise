@@ -40,9 +40,11 @@ export default class UIScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(12).setAlpha(0);
 
     // ── Event listeners ───────────────────────────────────────────────────
-    // ── Boss health bar (bottom-center, hidden until a boss spawns) ───────────
-    const bw = 520, bh = 16, bx = this.scale.width / 2, by = this.scale.height - 48;
-    this._bossName = this.add.text(bx, by - 22, '', {
+    // ── Boss health bar (top-center, hidden until a boss spawns) ──────────────
+    // Sits up top where boss bars conventionally live and the eye naturally goes —
+    // a bar pinned to the very bottom edge was too easy to miss mid-fight.
+    const bw = 560, bh = 18, bx = this.scale.width / 2, by = 92;
+    this._bossName = this.add.text(bx, by - 24, '', {
       fontSize: '18px', fill: '#ffccbb', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(12).setVisible(false);
@@ -113,7 +115,7 @@ export default class UIScene extends Phaser.Scene {
 
   _updateBossBar(hp, maxHp) {
     const frac = Phaser.Math.Clamp(hp / maxHp, 0, 1);
-    this._bossBar.setDisplaySize(Math.max(1, this._bossBarW * frac), 16);
+    this._bossBar.setDisplaySize(Math.max(1, this._bossBarW * frac), 18);
     this._bossBar.x = this._bossBarX - this._bossBarW / 2 + (this._bossBarW * frac) / 2;
     if (frac <= 0) {
       // Boss down — fade the bar away.

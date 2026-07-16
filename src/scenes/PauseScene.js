@@ -8,6 +8,7 @@ export default class PauseScene extends Phaser.Scene {
   }
 
   create(data) {
+    this.input.setDefaultCursor('default');   // bring the cursor back for the menu
     const { width: w, height: h } = this.scale;
     this._gameplayKey = data?.gameplayKey || 'Stage1Scene';
 

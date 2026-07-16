@@ -8,6 +8,7 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   create() {
+    this.input.setDefaultCursor('default');   // cursor visible in menus
     const { width: w, height: h } = this.scale;
     addBackdrop(this, { texture: 'stage1-bg' });
 
@@ -38,7 +39,7 @@ export default class MainMenuScene extends Phaser.Scene {
     [
       'yarsa:Stage1', 'yarsa:Stage2:1', 'yarsa:Stage2:2',
       'yarsa:Stage3:0', 'yarsa:Stage3:1', 'yarsa:Stage3:2',
-      'pendantGiven:Stage1', 'hpBonus', 'yarsaPocket',
+      'pendantGiven:Stage1', 'hpBonus', 'yarsaPocket', 'guleliUnlocked',
       'introSeen:Stage1', 'introSeen:Stage2', 'introSeen:Stage3',
     ].forEach((k) => this.registry.remove(k));
     SaveManager.recordStageReached(1);

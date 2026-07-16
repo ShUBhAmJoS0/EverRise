@@ -35,6 +35,9 @@ export default class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.body.setSize(cfg.bodySize, cfg.bodySize);
     this.setFlipX(dir < 0);
     this.body.setVelocityX(dir * cfg.speed);
+    // Optional vertical component so a caster can fan a spread of orbs at once
+    // (the Corrupted Monk's multi-shot). Gravity stays off, so vy is constant.
+    if (cfg.vy) this.body.setVelocityY(cfg.vy);
 
     this.play(cfg.travelAnim);
 

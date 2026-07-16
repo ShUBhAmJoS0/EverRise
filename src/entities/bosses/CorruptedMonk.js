@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
 import Enemy from '../Enemy.js';
 
-const MONK_HP            = 300;
-const MONK_SPEED         = 120;
-const MONK_ATTACK_RANGE  = 520;   // ranged caster — engages from far away
-const MONK_ATTACK_COOLDOWN = 1500; // ms between casts
+// Stage 2's final boss must stand above the Forest Witch (Stage 1, HP 340): a
+// harder, longer fight to match the rising difficulty curve.
+const MONK_HP            = 460;
+const MONK_SPEED         = 130;
+const MONK_ATTACK_RANGE  = 560;   // ranged caster — engages from far away
+const MONK_ATTACK_COOLDOWN = 1150; // ms between casts (was 1500 — presses harder)
+// He looses a fan of orbs at once: these are the vertical velocities of each
+// bolt in the spread (0 = dead level). A wider, denser fan is far harder to slip.
+const MONK_SPREAD_VY     = [-210, -70, 70, 210];
 const MONK_RELEASE_FRAME  = 13;   // 1-based frame where the purple orb leaves the staff
 
 // Stage 2 final boss. Charges a purple orb (13 frames of windup), launches it on
@@ -87,7 +92,8 @@ export default class CorruptedMonk extends Enemy {
   _fireProjectile(dir) {
     const x = this.x + dir * 80;
     const y = this.y - 40;
-    this.scene.spawnMonkProjectile(x, y, dir);
+    // Loose the whole fan at once — a level bolt plus angled ones above and below.
+    MONK_SPREAD_VY.forEach((vy) => this.scene.spawnMonkProjectile(x, y, dir, vy));
   }
 
   onDeath() {

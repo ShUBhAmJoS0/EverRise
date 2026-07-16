@@ -28,7 +28,11 @@ const config = {
   render: {
     pixelArt: false,
     antialias: true,
-    roundPixels: true,   // crisper sprite positions, less shimmer while scrolling
+    // roundPixels OFF: with a smooth (eased) camera, snapping positions to whole
+    // pixels made crisp-edged props (e.g. caves) visibly jitter and the scrolling
+    // background shimmer. Sub-pixel rendering keeps the motion fluid for this
+    // painted (non-pixel-art) look.
+    roundPixels: false,
   },
   physics: {
     default: 'arcade',

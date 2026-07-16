@@ -241,14 +241,16 @@ export default class Stage2Scene extends Phaser.Scene {
     this.events.emit('waveStarted', TOTAL_WAVE_COUNT, TOTAL_WAVE_COUNT);   // shows the BOSS banner in the HUD
   }
 
-  // Called by CorruptedMonk when its cast reaches the release frame.
-  spawnMonkProjectile(x, y, dir) {
+  // Called by CorruptedMonk when its cast reaches the release frame. `vy` fans
+  // the orb up/down so the monk can loose a spread of several at once.
+  spawnMonkProjectile(x, y, dir, vy = 0) {
     const orb = new Projectile(this, x, y, dir, {
       texture:    'purple-projectile',
       travelAnim: 'purple-travel',
       impactAnim: 'purple-impact',
-      damage:     20,   // attack power swapped with the Forest Witch (was 25)
-      speed:      300,
+      damage:     22,
+      speed:      320,
+      vy,
     });
     this.physics.add.overlap(this._player, orb, () => orb.hit(this._player));
     return orb;
@@ -291,8 +293,10 @@ export default class Stage2Scene extends Phaser.Scene {
   _buildBackground() {
     const tilesNeeded = Math.ceil(LEVEL_WIDTH / BG_TILE_W) + 1;
     for (let i = 0; i < tilesNeeded; i++) {
+      // Mirror alternate copies so the repeat seam disappears (see Stage1Scene).
       this.add.image(i * BG_TILE_W + BG_TILE_W / 2, GAME_HEIGHT / 2, 'stage2-bg')
-        .setDisplaySize(BG_TILE_W, GAME_HEIGHT)
+        .setDisplaySize(BG_TILE_W + 2, GAME_HEIGHT)
+        .setFlipX(i % 2 === 1)
         .setDepth(0);
     }
   }

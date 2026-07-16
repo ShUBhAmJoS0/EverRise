@@ -20,9 +20,15 @@ const BODY_OX = 96;    // centred on x≈128
 const BODY_OY = 0;     // body bottom = 150 → feet sit ~15px lower, walking ON the path
 const PLAYER_SPEED      = 230;
 const SPRINT_MULT       = 1.6;    // Left Shift while moving
-const PLAYER_JUMP_VEL   = -525;   // a little lower than before
-const DOUBLE_JUMP_VEL   = -485;   // second (air) jump, a touch weaker
+const PLAYER_JUMP_VEL   = -680;   // strong initial pop for a snappy launch
+const DOUBLE_JUMP_VEL   = -620;   // second (air) jump, a touch weaker
 const MAX_JUMPS         = 2;
+
+// Snappy, responsive arc (not floaty): world gravity is 800, and the player adds
+// this on top. Falling faster than the rise is the standard platformer trick that
+// makes the jump feel quick and weighty. Total air time ≈ 0.75s (was ~1.05s).
+const JUMP_RISE_GRAVITY = 900;    // + world 800 → 1700 while going up
+const JUMP_FALL_GRAVITY = 1300;   // + world 800 → 2100 while coming down
 
 // Jump feel (the "trinity"):
 // - Coyote time: you can still jump for a moment after walking off an edge.
@@ -90,7 +96,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     // resting the body on the floor puts the feet on the platform surface (no
     // sink, no clip). Keep the player locked inside the playable area.
     this.body.setCollideWorldBounds(true);
-    this.body.setGravityY(200);
+    this.body.setGravityY(JUMP_RISE_GRAVITY);
     this.body.setSize(BODY_W, BODY_H);
     this.body.setOffset(BODY_OX, BODY_OY);
 
@@ -123,6 +129,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this._scriptOnArrive = null;
     this._timers         = [];
     this._stones         = [];
+    // The Guleli is LOCKED until a grateful villager gifts it at the end of
+    // Stage 1 (registry flag, so it stays unlocked across stages/restarts).
+    this._guleliUnlocked = !!scene.registry.get('guleliUnlocked');
 
     this.controls = new InputManager(scene);
 
@@ -150,6 +159,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this._dodgeCooldown  -= delta;
     this._guleliCooldown -= delta;
     this._damageCooldown -= delta;
+
+    // Snappier jump: come down faster than you went up (kills the floaty feel).
+    this.body.setGravityY(this.body.velocity.y < 0 ? JUMP_RISE_GRAVITY : JUMP_FALL_GRAVITY);
 
     const onGround = this.body.blocked.down;
     if (onGround) {
@@ -333,8 +345,9 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
   _handleAttacks(enemies) {
     if (this._isAttacking) return;
 
-    // Guleli has its own cooldown so it can be used between melee swings.
-    if (this.controls.guleliPressed && this._guleliCooldown <= 0) {
+    // Guleli has its own cooldown so it can be used between melee swings — but
+    // only once it's been gifted (locked through all of Stage 1).
+    if (this._guleliUnlocked && this.controls.guleliPressed && this._guleliCooldown <= 0) {
       this._startGuleli();
       return;
     }
@@ -543,6 +556,13 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.maxHp += amount;
     this.hp = Math.min(this.maxHp, this.hp + amount + heal);
     this.scene.events.emit('playerHealthChanged', this.hp, this.maxHp);
+  }
+
+  // Grant the Guleli (the villager's Stage-1 gift). Persisted so it stays
+  // unlocked across stage transitions and death-restarts.
+  unlockGuleli() {
+    this._guleliUnlocked = true;
+    this.scene.registry.set('guleliUnlocked', true);
   }
 
   // ── Damage / death ───────────────────────────────────────────────────────────

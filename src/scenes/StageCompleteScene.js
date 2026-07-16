@@ -6,6 +6,7 @@ export default class StageCompleteScene extends Phaser.Scene {
   }
 
   create() {
+    this.input.setDefaultCursor('default');   // cursor visible on the interstitial
     const cx = this.scale.width  / 2;
     const cy = this.scale.height / 2;
 

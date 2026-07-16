@@ -27,6 +27,7 @@ export default class CreditsScene extends Phaser.Scene {
   }
 
   create() {
+    this.input.setDefaultCursor('default');   // cursor visible on the end screen
     const { width: w, height: h } = this.scale;
     addBackdrop(this, { texture: 'stage3-bg' });
 

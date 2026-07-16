@@ -6,9 +6,11 @@ import { shake, impactSparks, dustBurst } from '../../systems/fx.js';
 // A corrupted snow leopard — fast, low-slung predator that stalks the player
 // across the glacier and lunges in with a snarling bite at close range.
 
-const LEOPARD_HP              = 90;
-const LEOPARD_SPEED           = 230;
-const LEOPARD_ATTACK_DMG      = 24;
+// Stage 3 tops the curve: tougher than the Narapichas (Stage 2, HP 175) and
+// still the fastest thing on four legs — a tanky, relentless glacier predator.
+const LEOPARD_HP              = 205;
+const LEOPARD_SPEED           = 235;
+const LEOPARD_ATTACK_DMG      = 26;
 // Player+enemy bodies collide (see Stage3Scene._spawnEnemy), which keeps their
 // centers at least ~half-widths apart (~135px) — the range must clear that
 // gap or the bite can never trigger.

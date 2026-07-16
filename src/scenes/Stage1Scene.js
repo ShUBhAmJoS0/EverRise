@@ -28,6 +28,16 @@ const BG_TILE_WIDTH  = 1774 * BG_SCALE;
 const YARSA_KEY = 'yarsa:Stage1';   // registry flag: herb already eaten this run
 const YARSA_X   = 3380;             // where it lies in the grass, before the witch
 
+// ── Budo Khate (village elder) cutscene metrics ──────────────────────────────
+// Measured directly off the sprite sheets (alpha bounding box per frame) — see
+// _buildVillager for how they're used to plant him on the hero's ground line.
+const FRAME_MID     = 128;   // 256px frames drawn at origin 0.5
+const HERO_FEET_ROW = 203;   // main-character/idle.png: visible feet row
+const BUDO_FEET_ROW = 222;   // budo_khate-walk.png: visible feet row
+// 187px-tall figure × 0.8 ≈ 150px on screen, just under the hero's ~161px —
+// a stooped elder reads slightly shorter than the Guardian.
+const BUDO_SCALE    = 0.8;
+
 // ── Story (simple + clear, told across all three stages) ─────────────────────
 // Ch. I: a corrupted wolf attacks the village. The hero and villagers beat it
 // back; the elder then sends the hero to find the corruption's source in the
@@ -41,6 +51,19 @@ const PENDANT_LINES = [
   { speaker: 'ELDER', text: 'The beast is beaten. But this corruption came from the Himalayas — you must find its source.' },
   { speaker: 'ELDER', text: 'Take this lucky pendant. May it keep you safe on the mountain path.' },
   { speaker: 'THE GUARDIAN', text: 'I will not fail you. For the village — for the mountains.' },
+];
+
+// After the Forest Witch falls, a grateful villager hurries out to thank the
+// Guardian and presses his own guleli — a hunter's slingshot — into the hero's
+// hands, so he can strike the beasts of the high peaks from afar. This is what
+// UNLOCKS the Guleli weapon: it's kept locked through all of Stage 1.
+const VILLAGER_GIFT_BEFORE = [
+  { speaker: 'VILLAGER', text: 'Guardian! You drove the corruption from our forest. But your blade alone won\'t reach the beasts of the high peaks.' },
+  { speaker: 'THE GUARDIAN', text: 'The source of this rot lies far up the Himalayas. I will face whatever guards it.' },
+  { speaker: 'VILLAGER', text: 'Then take this — my guleli. A hunter\'s slingshot, passed down in my family. Draw it back, and strike your foes from afar.' },
+];
+const VILLAGER_GIFT_AFTER = [
+  { speaker: 'THE GUARDIAN', text: 'A fine weapon. I will bring down what my khukuri cannot reach. Thank you, friend.' },
 ];
 
 export default class Stage1Scene extends Phaser.Scene {
@@ -216,8 +239,12 @@ export default class Stage1Scene extends Phaser.Scene {
   _buildBackground() {
     const tilesNeeded = Math.ceil(LEVEL_WIDTH / BG_TILE_WIDTH) + 1;
     for (let i = 0; i < tilesNeeded; i++) {
+      // The painted background isn't horizontally seamless, so mirror every other
+      // copy: a flipped tile's edge matches its neighbour's edge exactly, hiding
+      // the repeat "line". The +2px overlap swallows any sub-pixel hairline.
       this.add.image(i * BG_TILE_WIDTH + BG_TILE_WIDTH / 2, GAME_HEIGHT / 2, 'stage1-bg')
-        .setDisplaySize(BG_TILE_WIDTH, GAME_HEIGHT)
+        .setDisplaySize(BG_TILE_WIDTH + 2, GAME_HEIGHT)
+        .setFlipX(i % 2 === 1)
         .setDepth(0);
     }
   }
@@ -363,13 +390,109 @@ export default class Stage1Scene extends Phaser.Scene {
   }
 
   _onBossDefeated() {
-    // The witch has fallen — the mountain cave beyond now beckons. Instead of an
-    // instant cut, the player walks into the cave to travel onward.
+    // The witch has fallen. Beat, then a villager comes to thank the hero and
+    // hand over a parting gift before the mountain cave beyond opens up.
     this.time.delayedCall(1400, () => {
-      if (!this._player.active) return;
-      this._endCave.arm();
-      say(this, this._player, 'The forest is cleansed. Now — onward to the Himalayas.', 3600);
+      if (!this._player.active || this._giftGiven) return;
+      this._giftGiven = true;
+      this._villagerGiftCutscene().then(() => {
+        if (!this._player.active) return;
+        this._endCave.arm();
+        say(this, this._player, 'The forest is cleansed. Now — onward to the Himalayas.', 3600);
+      });
     });
+  }
+
+  // Small Promise wrapper around a tween so the cutscene can `await` each beat.
+  _tweenP(config) {
+    return new Promise((resolve) => this.tweens.add({ ...config, onComplete: resolve }));
+  }
+
+  // The village elder (budo khate) who gifts the Guleli — his own walk sheet.
+  //
+  // Both sheets use 256px frames drawn at origin 0.5, so a frame's row R sits at
+  // world `sprite.y + (R - 128) * scale`. Rows below were measured off the sheets
+  // directly (alpha bounding box, consistent across every frame):
+  //   budo_khate-walk.png → feet row 222, figure 187px tall, faces RIGHT
+  //   main-character/idle.png → feet row 203, figure 149px tall
+  // Solving those for a shared ground line plants him exactly where the hero
+  // stands, at any player scale — no hand-picked Y.
+  _buildVillager(x) {
+    const player  = this._player;
+    const heroFeetY = player.y + (HERO_FEET_ROW - FRAME_MID) * player.scaleY;
+    const y = heroFeetY - (BUDO_FEET_ROW - FRAME_MID) * BUDO_SCALE;
+
+    const v = this.add.sprite(x, y, 'budo-walk').setDepth(9);
+    v.setScale(BUDO_SCALE);
+    v.play('budo-walk');
+    return v;
+  }
+
+  // A small slingshot (guleli) icon drawn from primitives — the gift the villager
+  // hands over. Container so it can float from the villager to the hero.
+  _buildGuleliIcon(x, y) {
+    const c = this.add.container(x, y).setDepth(30).setScale(1.7);
+    const g = this.add.graphics();
+    g.lineStyle(5, 0x7a4a24, 1);
+    g.beginPath(); g.moveTo(0, 15); g.lineTo(0, 0); g.strokePath();      // handle
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(-10, -15); g.strokePath();   // left prong
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(10, -15); g.strokePath();    // right prong
+    g.lineStyle(2, 0x2a2a2a, 0.9);
+    g.beginPath(); g.moveTo(-10, -15); g.lineTo(10, -15); g.strokePath(); // band
+    c.add(g);
+    return c;
+  }
+
+  // Chapter-I coda: the villager walks in, thanks the hero, hands over his guleli
+  // (which UNLOCKS the slingshot weapon for Stage 2 onward), and heads home.
+  async _villagerGiftCutscene() {
+    const player = this._player;
+    player.enterCutscene();
+
+    const startX = player.x + 520;
+    const endX   = player.x + 165;
+    const villager = this._buildVillager(startX);
+    // Hobble in from the right. The sheet faces RIGHT by default and he's heading
+    // LEFT, so flip him — and keep him flipped through the talk so he faces the
+    // hero. Slow tween to match an old man's pace on a cane.
+    villager.setFlipX(true);
+    await this._tweenP({ targets: villager, x: endX, duration: 2500, ease: 'Sine.inOut' });
+    villager.anims.stop();   // stand still while he speaks
+
+    await runDialogue(this, VILLAGER_GIFT_BEFORE);
+    if (!player.active) { villager.destroy(); return; }
+
+    // The guleli lifts from the elder's hands and floats across to the hero.
+    const gx = villager.x - 26, gy = villager.y - 6;
+    const glow = this.add.circle(gx, gy, 22, 0xffe7a8, 0.4).setDepth(29);
+    const guleli = this._buildGuleliIcon(gx, gy);
+    Audio.play('pickup');
+    // Gentle spin on `angle` only — a second y-tween would fight the cross-tween.
+    this.tweens.add({ targets: guleli, angle: 20, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    await this._tweenP({
+      targets: [guleli, glow], x: player.x, y: player.y - 30, duration: 950, ease: 'Sine.inOut',
+    });
+    impactSparks(this, player.x, player.y - 30, 0xffe7a8, 14);
+    this.tweens.killTweensOf([guleli, glow]);   // stop the looping spin before destroy
+    guleli.destroy(); glow.destroy();
+
+    // THE gift: unlock the Guleli weapon (persisted so it carries into Stage 2+).
+    await itemReward(this, {
+      name: 'Guleli — Hunter\'s Slingshot',
+      desc: 'A ranged weapon. Hold Middle-Mouse (or Right Ctrl) to draw, release to fire; aim with W/S.',
+      color: 0xffe7a8,
+    });
+    if (player.active) player.unlockGuleli();
+
+    await runDialogue(this, VILLAGER_GIFT_AFTER);
+
+    // He turns around and hobbles home — heading right, the sheet's default facing.
+    villager.setFlipX(false);
+    villager.play('budo-walk');
+    await this._tweenP({ targets: villager, x: startX, duration: 2500, ease: 'Sine.in' });
+    villager.destroy();
+
+    if (player.active) player.exitCutscene();
   }
 
   _enterEndCave() {
