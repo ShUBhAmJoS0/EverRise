@@ -1,0 +1,9 @@
+# Netlify deploy config for EverRise (static Vite build).
+# Connect the repo at app.netlify.com → "Add new site" → "Import from Git";
+# these settings are picked up automatically, so no dashboard fields to fill in.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
