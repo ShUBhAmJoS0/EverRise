@@ -6,15 +6,52 @@ const LINES = [
   ['', ''],
   ['A Himalayan action-platformer', 'sub'],
   ['', ''],
-  ['Design & Direction', 'head'],
-  ['The EverRise Team', 'body'],
+
+  ['Game Concept & Gamification', 'head'],
+  ['Asim Ghimire', 'body'],
   ['', ''],
+
+  ['Game Design', 'head'],
+  ['Asim Ghimire   &   Shubham Joshi', 'body'],
+  ['', ''],
+
+  ['Game Script & Story', 'head'],
+  ['Shubham Joshi', 'body'],
+  ['', ''],
+  ['', ''],
+
+  ['—  Stage Design  —', 'sub'],
+  ['', ''],
+
+  ['Stage I · Onboarding & Reward Loop', 'head'],
+  ['Asim Ghimire', 'body'],
+  ['Storyline, the Guleli gift, Yarsagumba rewards & progression', 'sub'],
+  ['', ''],
+
+  ['Stage II · Challenge & Progression', 'head'],
+  ['Prabin Giri', 'body'],
+  ['Difficulty curve, enemy encounters & exploration rewards', 'sub'],
+  ['', ''],
+
+  ['Stage II · Risk & Discovery', 'head'],
+  ['Rasrim Sigdel', 'body'],
+  ['Hidden paths, risk-vs-reward, dynamic obstacles & testing', 'sub'],
+  ['', ''],
+
+  ['Stage III · Mastery & Boss Encounter', 'head'],
+  ['Shubham Joshi', 'body'],
+  ['Advanced combat, enemy AI, the Yeti King & achievements', 'sub'],
+  ['', ''],
+  ['', ''],
+
   ['Programming', 'head'],
   ['Built on Phaser 3', 'body'],
   ['', ''],
+
   ['Art & Animation', 'head'],
   ['Original character, enemy & environment art', 'body'],
   ['', ''],
+
   ['Inspired by', 'head'],
   ['The mountains, temples & legends of Nepal', 'body'],
   ['', ''],
@@ -43,11 +80,14 @@ export default class CreditsScene extends Phaser.Scene {
       y += (kind === 'title' ? 70 : 38);
     }
 
-    // Slow auto-scroll, then loop.
+    // Slow auto-scroll, then loop. Duration scales with the reel length so the
+    // scroll SPEED stays constant (and readable) no matter how many credits.
     const totalHeight = y - h;
+    const travel = totalHeight + 80;
     this.tweens.add({
-      targets: container, y: -(totalHeight + 80),
-      duration: 14000, ease: 'Linear', repeat: -1,
+      targets: container, y: -travel,
+      duration: Math.round(travel / 0.07),   // ~70 px/s
+      ease: 'Linear', repeat: -1,
     });
 
     this.add.text(w / 2, h - 28, 'Esc / Enter to return', hintStyle).setOrigin(0.5).setDepth(6);
