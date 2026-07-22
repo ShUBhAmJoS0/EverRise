@@ -15,7 +15,7 @@ const YETI_FOLLOW_RANGE = 90;    // hounds the player this close, mace ready
 // raised guard can't parry it (dodge it instead). Fires on a fixed 6s clock and
 // always chunks 15% of the player's MAX HP.
 const YETI_BLIZZARD_COOLDOWN      = 4800;  // faster storms as the finale demands
-const YETI_BLIZZARD_PCT           = 0.15;  // 15% of the player's max HP
+const YETI_BLIZZARD_PCT           = 0.10;  // 15% of the player's max HP
 const YETI_BLIZZARD_TRIGGER_FRAME = 5;     // where the frost burst first appears
 
 // The mace swing is an ordinary melee blow — the heaviest in the game, but a
