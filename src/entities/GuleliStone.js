@@ -15,7 +15,7 @@ const AIM_DOWN  = 170;   // downward velocity when aiming down (S / ↓)
 // is light (long, floaty arc → far); a weak tap is heavy (drops quickly → near).
 const GRAV_FULL = 300;
 const GRAV_WEAK = 760;
-const DAMAGE    = 32;
+const DAMAGE    = 65;
 const KNOCKBACK = 240;
 const LIFE_MS   = 2600;
 
