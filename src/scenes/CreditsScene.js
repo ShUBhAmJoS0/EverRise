@@ -6,13 +6,16 @@ const LINES = [
   ['', ''],
   ['A Himalayan action-platformer', 'sub'],
   ['', ''],
-
-  ['Game Concept & Gamification', 'head'],
-  ['Asim Ghimire', 'body'],
+  ['The EverRise Team', 'head'],
+  ['', ''],
   ['', ''],
 
-  ['Game Design', 'head'],
+  ['Game Concept & Design', 'head'],
   ['Asim Ghimire   &   Shubham Joshi', 'body'],
+  ['', ''],
+
+  ['Gamification Implementation', 'head'],
+  ['Asim Ghimire', 'body'],
   ['', ''],
 
   ['Game Script & Story', 'head'],
@@ -44,12 +47,24 @@ const LINES = [
   ['', ''],
   ['', ''],
 
-  ['Programming', 'head'],
-  ['Built on Phaser 3', 'body'],
+  ['Environmental & Puzzle Design', 'head'],
+  ['Prabin Giri', 'body'],
   ['', ''],
 
-  ['Art & Animation', 'head'],
-  ['Original character, enemy & environment art', 'body'],
+  ['Level Testing & Balancing', 'head'],
+  ['Rasrim Sigdel', 'body'],
+  ['', ''],
+
+  ['Assets', 'head'],
+  ['Prabin Giri   ·   Rasrim Sigdel   ·   Shubham Joshi', 'body'],
+  ['', ''],
+
+  ['Animation & Sound', 'head'],
+  ['Asim Ghimire', 'body'],
+  ['', ''],
+
+  ['Programming', 'head'],
+  ['Built on Phaser 3', 'body'],
   ['', ''],
 
   ['Inspired by', 'head'],
